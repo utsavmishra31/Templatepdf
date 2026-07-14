@@ -1,0 +1,30 @@
+{
+  "name": "translation_generator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "docx-preview": "^0.3.7",
+    "html2pdf.js": "^0.10.3",
+    "jszip": "^3.10.1",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.5.2",
+    "eslint": "^9.16.0",
+    "eslint-config-next": "^15.1.0",
+    "postcss": "^8.5.19",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.7.2"
+  }
+}

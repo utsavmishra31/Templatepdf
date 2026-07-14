@@ -8,11 +8,18 @@ env/
 
 .env
 
-translation_generator/logs/*
-!translation_generator/logs/.gitkeep
+node_modules/
+.next/
+.turbo/
+.vercel/
+npm-debug.log*
 
-translation_generator/output/*
-!translation_generator/output/.gitkeep
+logs/*
+!logs/.gitkeep
 
-translation_generator/uploads/*
-!translation_generator/uploads/.gitkeep
+output/*
+!output/.gitkeep
+
+uploads/*
+!uploads/.gitkeep
+node_modules

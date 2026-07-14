@@ -1,6 +1,6 @@
-# Manual Translation Template Filler
+# Manual Translation Template Filler (Next.js + TypeScript)
 
-A frontend-only browser app for filling Spanish translation DOCX templates manually. The app does not run OCR, does not upload source PDFs, and does not require a Python backend.
+A frontend-only Next.js app for filling Spanish translation DOCX templates manually. The app does not run OCR, does not upload source PDFs, and does not require a Python backend.
 
 Supported templates:
 - PCC Jalandhar
@@ -23,38 +23,45 @@ Supported templates:
 
 ```text
 translation_generator/
-├─ index.html
-├─ app.js
-├─ styles.css
-├─ README.md
-└─ templates/
-   ├─ BIRTH.docx
-   ├─ MARRIAGE.docx
-   ├─ MEDICAL.docx
-   ├─ pccChandigarh.docx
-   └─ pccjalandhar.docx
+├─ app/
+│  ├─ globals.css
+│  ├─ layout.tsx
+│  └─ page.tsx
+├─ lib/
+│  └─ template.ts
+├─ public/
+│  └─ templates/
+│     ├─ BIRTH.docx
+│     ├─ MARRIAGE.docx
+│     ├─ MEDICAL.docx
+│     ├─ pccChandigarh.docx
+│     └─ pccjalandhar.docx
+├─ package.json
+└─ README.md
 ```
 
 ## Template Setup
 
-Place DOCX templates in `templates/`. The frontend reads `<<PLACEHOLDER>>` values directly from the selected DOCX file, so no separate mapping file is required.
+Place DOCX templates in `public/templates/`. The frontend reads `<<PLACEHOLDER>>` values directly from the selected DOCX file, so no separate mapping file is required.
 
 ## Run the App
 
 ```bash
-python3 -m http.server 8080 --directory /Users/utsav/Desktop/tempPdf/translation_generator
+cd /Users/utsav/Desktop/Templatepdf/translation_generator
+npm install
+npm run dev
 ```
 
-Open `http://127.0.0.1:8080/` in a browser.
+Open `http://localhost:3000` in a browser.
 
 ## Add a New Template
 
-1. Add the `.docx` file under `templates/`.
-2. Add one entry to `TEMPLATE_OPTIONS` in `app.js`.
+1. Add the `.docx` file under `public/templates/`.
+2. Add one entry to `templateOptions` in `lib/template.ts`.
 3. Use placeholders in the `<<NAME>>` format inside the DOCX.
 
 ## Notes
 
-- Opening `index.html` directly from Finder may block template loading. Use the local static server command above.
+- This app runs in Next.js and should be started using `npm run dev` or built using `npm run build`.
 - DOCX output keeps the original template file structure and replaces placeholders inside Word XML.
 - PDF output is generated from the browser-rendered preview. Inspect the DOCX when exact legal formatting is required.
