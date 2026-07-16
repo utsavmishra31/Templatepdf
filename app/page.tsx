@@ -335,7 +335,28 @@ export default function Home() {
             <p className="eyebrow">Spanish Translation Templates</p>
             <h1 id="appTitle">Manual Template Filler</h1>
           </div>
-          <span className="status-pill">Frontend only</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <a
+              href="/upload"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                background: "var(--accent)",
+                color: "#fff",
+                borderRadius: 8,
+                textDecoration: "none",
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: "0.03em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ✏️ Upload &amp; Edit DOCX
+            </a>
+            <span className="status-pill">Frontend only</span>
+          </div>
         </div>
 
         <div className="template-strip">
