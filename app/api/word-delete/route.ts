@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { enrichDocxWithPageMarkers } from "@/lib/server/word-backend";
 import { deleteWordPages } from "@/lib/word-tools";
 
 export const runtime = "nodejs";
@@ -55,19 +54,7 @@ export async function POST(request: Request) {
     }
 
     const sourceBuffer = await file.arrayBuffer();
-
-    // Attempt to enrich the DOCX via LibreOffice so that its layout engine
-    // writes `w:lastRenderedPageBreak` markers.  Our page splitter already
-    // reads those, turning a heuristic into a true layout-aware detection.
-    // Fall back to the original buffer if LibreOffice is unavailable.
-    let workingBuffer: ArrayBuffer | Buffer = sourceBuffer;
-    try {
-      workingBuffer = await enrichDocxWithPageMarkers(sourceBuffer);
-    } catch {
-      // LibreOffice enrichment unavailable — proceed with original DOCX.
-    }
-
-    const result = await deleteWordPages(workingBuffer, selectedPages);
+    const result = await deleteWordPages(sourceBuffer, selectedPages);
 
     return new Response(Buffer.from(result.bytes), {
       headers: {

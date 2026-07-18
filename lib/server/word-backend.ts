@@ -72,15 +72,19 @@ export async function generateWordPreviewPdf(sourceBuffer: ArrayBuffer | Uint8Ar
 }
 
 /**
- * Round-trip a DOCX through LibreOffice's layout engine.
+ * Round-trip a DOCX through LibreOffice's DOCX export filter.
  *
- * LibreOffice writes `w:lastRenderedPageBreak` elements during DOCX export,
- * marking exactly where its renderer placed each page break.  Our XML-level
- * page splitter already reads those markers, so after enrichment it reflects
- * LibreOffice's true pagination rather than a heuristic one.
+ * NOTE (verified via scripts/test-lo-page-markers.mjs):
+ * LibreOffice does NOT write `w:lastRenderedPageBreak` elements during this
+ * round-trip, so the output cannot be used to infer flowing-content page
+ * boundaries.  The function is kept for potential future use (e.g. format
+ * normalisation or testing) but must not be used for page detection.
  *
- * Throws if LibreOffice is unavailable or conversion fails — callers should
- * fall back to the original buffer in that case.
+ * True layout-accurate page deletion would require the LibreOffice UNO API
+ * (XPageCursor / XTextViewCursor) running inside a LibreOffice process —
+ * see scripts/test-lo-page-markers.mjs for details.
+ *
+ * Throws if LibreOffice is unavailable or conversion fails.
  */
 export async function enrichDocxWithPageMarkers(
   sourceBuffer: ArrayBuffer | Uint8Array,
