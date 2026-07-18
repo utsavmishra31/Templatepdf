@@ -2,6 +2,11 @@
 
 import { ChangeEvent, useMemo, useState } from "react";
 import JSZip from "jszip";
+import { DocumentPreview } from "@/components/editor/DocumentPreview";
+import { EntryTabs } from "@/components/editor/EntryTabs";
+import { PdfToolsPanel } from "@/components/editor/PdfToolsPanel";
+import { TemplateSelector } from "@/components/editor/TemplateSelector";
+import { deletePdfPages, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import {
   currentOutputName,
   downloadBlob,
@@ -10,8 +15,6 @@ import {
   getDisplayPlaceholders,
   getDropdownLookupKey,
   getDropdownOptions,
-  hasDropdownOptions,
-  humanizePlaceholder,
   isAutomaticDatePlaceholder,
   normalizeDateValue,
   parseBulkPlaceholderValues,
@@ -21,10 +24,7 @@ import {
   type TabType,
   type TemplateKey,
 } from "@/lib/template";
-
-type StatusType = "" | "success" | "error";
-
-type FormValues = Record<string, string>;
+import type { FormValues, StatusType } from "@/types/editor";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -44,10 +44,42 @@ export default function Home() {
   const [previewBadge, setPreviewBadge] = useState("Ready");
   const [isBusy, setIsBusy] = useState(false);
 
+  const [uploadedPdfName, setUploadedPdfName] = useState("");
+  const [uploadedPdfBuffer, setUploadedPdfBuffer] = useState<ArrayBuffer | null>(null);
+  const [uploadedPdfPreviews, setUploadedPdfPreviews] = useState<string[]>([]);
+  const [selectedPdfPages, setSelectedPdfPages] = useState<number[]>([]);
+  const [pdfStatus, setPdfStatus] = useState("");
+  const [pdfStatusType, setPdfStatusType] = useState<StatusType>("");
+  const [isPdfBusy, setIsPdfBusy] = useState(false);
+
   const displayedPlaceholders = useMemo(
     () => getDisplayPlaceholders(selectedKey, placeholders),
     [selectedKey, placeholders],
   );
+
+  function applyStatus(message: string, type: StatusType) {
+    setStatusType(type);
+    setStatusMessage(message);
+  }
+
+  function applyPdfStatus(message: string, type: StatusType) {
+    setPdfStatusType(type);
+    setPdfStatus(message);
+  }
+
+  function resetTemplateState(nextKey: TemplateKey | "") {
+    setSelectedKey(nextKey);
+    setTemplateBuffer(null);
+    setPlaceholders([]);
+    setFormValues({});
+    setBulkInput("");
+    setBulkResult("");
+    setBulkResultType("");
+    setActiveTab("bulk");
+    setPreviewVisible(false);
+    setPreviewHtml("");
+    setPreviewBadge("Ready");
+  }
 
   async function handleTemplateChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextKey = event.target.value as TemplateKey | "";
@@ -93,57 +125,6 @@ export default function Home() {
     } finally {
       setIsBusy(false);
     }
-  }
-
-  function resetTemplateState(nextKey: TemplateKey | "") {
-    setSelectedKey(nextKey);
-    setTemplateBuffer(null);
-    setPlaceholders([]);
-    setFormValues({});
-    setBulkInput("");
-    setBulkResult("");
-    setBulkResultType("");
-    setActiveTab("bulk");
-    setPreviewVisible(false);
-    setPreviewHtml("");
-    setPreviewBadge("Ready");
-  }
-
-  function applyStatus(message: string, type: StatusType) {
-    setStatusType(type);
-    setStatusMessage(message);
-  }
-
-  function applyBulkInput() {
-    const parsed = parseBulkPlaceholderValues(bulkInput);
-    if (!bulkInput.trim()) {
-      setBulkResult("Paste placeholder values first.");
-      setBulkResultType("error");
-      return;
-    }
-
-    const valid = Object.entries(parsed).filter(([placeholder]) => placeholder in formValues);
-    if (!valid.length) {
-      setBulkResult("No matching placeholders found for this template.");
-      setBulkResultType("error");
-      return;
-    }
-
-    setFormValues((previous) => {
-      const next = { ...previous };
-      valid.forEach(([placeholder, value]) => {
-        if (!isAutomaticDatePlaceholder(placeholder)) {
-          next[placeholder] = normalizeDropdownValue(placeholder, value);
-        }
-      });
-      return next;
-    });
-
-    const ignoredCount = Object.keys(parsed).length - valid.length;
-    const ignored = ignoredCount > 0 ? ` ${ignoredCount} placeholder(s) ignored because they are not in this template.` : "";
-    setBulkResult(`Autofilled ${valid.length} field(s).${ignored}`);
-    setBulkResultType("success");
-    setActiveTab("fields");
   }
 
   function normalizeDropdownValue(placeholder: string, value: string) {
@@ -204,10 +185,47 @@ export default function Home() {
     return aliasMatch ? aliasMatch.value : normalizeDateValue(trimmed);
   }
 
+  function applyBulkInput() {
+    const parsed = parseBulkPlaceholderValues(bulkInput);
+    if (!bulkInput.trim()) {
+      setBulkResult("Paste placeholder values first.");
+      setBulkResultType("error");
+      return;
+    }
+
+    const valid = Object.entries(parsed).filter(([placeholder]) => placeholder in formValues);
+    if (!valid.length) {
+      setBulkResult("No matching placeholders found for this template.");
+      setBulkResultType("error");
+      return;
+    }
+
+    setFormValues((previous) => {
+      const next = { ...previous };
+      valid.forEach(([placeholder, value]) => {
+        if (!isAutomaticDatePlaceholder(placeholder)) {
+          next[placeholder] = normalizeDropdownValue(placeholder, value);
+        }
+      });
+      return next;
+    });
+
+    const ignoredCount = Object.keys(parsed).length - valid.length;
+    const ignored = ignoredCount > 0 ? ` ${ignoredCount} placeholder(s) ignored because they are not in this template.` : "";
+    setBulkResult(`Autofilled ${valid.length} field(s).${ignored}`);
+    setBulkResultType("success");
+    setActiveTab("fields");
+  }
+
   function clearBulkInput() {
     setBulkInput("");
     setBulkResult("Bulk box cleared.");
     setBulkResultType("success");
+  }
+
+  function handleFieldValueChange(token: string, value: string) {
+    const next = isAutomaticDatePlaceholder(token) ? formValues[token] ?? "" : normalizeDateValue(value);
+    setFormValues((previous) => ({ ...previous, [token]: next }));
   }
 
   async function buildDocxBlob() {
@@ -317,6 +335,7 @@ export default function Home() {
     placeholders.forEach(({ token }) => {
       next[token] = isAutomaticDatePlaceholder(token) ? defaults[token] : "";
     });
+
     setFormValues(next);
     setPreviewVisible(false);
     setPreviewHtml("");
@@ -325,160 +344,181 @@ export default function Home() {
     applyStatus("Fields cleared.", "success");
   }
 
+  async function handleUploadPdf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      applyPdfStatus("Please upload a valid PDF file.", "error");
+      return;
+    }
+
+    setIsPdfBusy(true);
+    applyPdfStatus("Reading PDF file...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const previews = await renderPdfPagePreviews(buffer);
+
+      if (!previews.length) {
+        throw new Error("The uploaded PDF has no pages.");
+      }
+
+      setUploadedPdfName(file.name);
+      setUploadedPdfBuffer(buffer);
+      setUploadedPdfPreviews(previews);
+      setSelectedPdfPages([]);
+      applyPdfStatus(`Loaded ${previews.length} page(s). Select pages you want to delete.`, "success");
+    } catch (error) {
+      setUploadedPdfName("");
+      setUploadedPdfBuffer(null);
+      setUploadedPdfPreviews([]);
+      setSelectedPdfPages([]);
+      applyPdfStatus(error instanceof Error ? error.message : "Could not read this PDF.", "error");
+    } finally {
+      setIsPdfBusy(false);
+    }
+  }
+
+  function clearUploadedPdf() {
+    setUploadedPdfName("");
+    setUploadedPdfBuffer(null);
+    setUploadedPdfPreviews([]);
+    setSelectedPdfPages([]);
+    applyPdfStatus("PDF selection cleared.", "success");
+  }
+
+  function togglePdfPageSelection(pageNumber: number) {
+    setSelectedPdfPages((previous) => {
+      if (previous.includes(pageNumber)) {
+        return previous.filter((item) => item !== pageNumber);
+      }
+
+      return [...previous, pageNumber].sort((a, b) => a - b);
+    });
+  }
+
+  async function handleDeleteSelectedPdfPages() {
+    if (!uploadedPdfBuffer || !uploadedPdfName) {
+      applyPdfStatus("Upload a PDF first.", "error");
+      return;
+    }
+
+    if (!selectedPdfPages.length) {
+      applyPdfStatus("Select at least one page to delete.", "error");
+      return;
+    }
+
+    setIsPdfBusy(true);
+    applyPdfStatus("Deleting selected pages...", "");
+
+    try {
+      const result = await deletePdfPages(uploadedPdfBuffer, selectedPdfPages);
+      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer);
+
+      const baseName = uploadedPdfName.replace(/\.pdf$/i, "") || "edited";
+      const outputName = `${baseName}-updated.pdf`;
+      downloadBlob(new Blob([result.bytes], { type: "application/pdf" }), outputName);
+
+      setUploadedPdfName(outputName);
+      setUploadedPdfBuffer(result.nextBuffer);
+      setUploadedPdfPreviews(nextPreviews);
+      setSelectedPdfPages([]);
+      applyPdfStatus(`Deleted ${result.removedCount} page(s). Downloaded ${outputName}.`, "success");
+    } catch (error) {
+      applyPdfStatus(error instanceof Error ? error.message : "Page deletion failed.", "error");
+    } finally {
+      setIsPdfBusy(false);
+    }
+  }
+
   const selectedTemplateLabel = selectedKey ? templateOptions[selectedKey].label : "";
 
   return (
-    <main className="app-shell">
-      <section className="tool-panel" aria-labelledby="appTitle">
-        <div className="topbar">
-          <div>
-            <p className="eyebrow">Spanish Translation Templates</p>
-            <h1 id="appTitle">Manual Template Filler</h1>
-          </div>
-          <span className="status-pill">Frontend only</span>
-        </div>
+    <main className="mx-auto w-[min(1180px,calc(100%-32px))] py-9 max-md:w-[min(100%-22px,1180px)] max-md:pt-5">
+      <section className="rounded-lg border border-slate-200 bg-white/95 p-7 shadow-[0_20px_60px_rgba(32,36,31,0.12)] max-md:p-5" aria-labelledby="appTitle">
+        <TemplateSelector
+          selectedKey={selectedKey}
+          displayedPlaceholders={displayedPlaceholders}
+          selectedTemplateLabel={selectedTemplateLabel}
+          isBusy={isBusy}
+          onTemplateChange={handleTemplateChange}
+        />
 
-        <div className="template-strip">
-          <label className="select-field" htmlFor="templateSelect">
-            <span>Template</span>
-            <select id="templateSelect" value={selectedKey} onChange={handleTemplateChange} disabled={isBusy} autoComplete="off">
-              <option value="">Choose template</option>
-              {Object.entries(templateOptions).map(([key, template]) => (
-                <option key={key} value={key}>
-                  {template.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="template-meta">
-            {!selectedKey && "Select a template to load its placeholders."}
-            {selectedKey && `${selectedTemplateLabel} - ${displayedPlaceholders.length} placeholders loaded.`}
-          </div>
-        </div>
+        <EntryTabs
+          displayedPlaceholders={displayedPlaceholders}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          bulkInput={bulkInput}
+          onBulkInputChange={setBulkInput}
+          onApplyBulk={applyBulkInput}
+          onClearBulk={clearBulkInput}
+          bulkResult={bulkResult}
+          bulkResultType={bulkResultType}
+          formValues={formValues}
+          onFieldChange={handleFieldValueChange}
+          isBusy={isBusy}
+        />
 
         {displayedPlaceholders.length > 0 && (
-          <div className="entry-tabs" id="entryTabs">
-            <div className="tab-list" role="tablist" aria-label="Entry mode">
-              <button
-                type="button"
-                className={`tab-button ${activeTab === "bulk" ? "active" : ""}`}
-                onClick={() => setActiveTab("bulk")}
-                role="tab"
-                aria-selected={activeTab === "bulk"}
-                disabled={isBusy}
-              >
-                Bulk Paste
-              </button>
-              <button
-                type="button"
-                className={`tab-button ${activeTab === "fields" ? "active" : ""}`}
-                onClick={() => setActiveTab("fields")}
-                role="tab"
-                aria-selected={activeTab === "fields"}
-                disabled={isBusy}
-              >
-                Empty Fields
-              </button>
-            </div>
-
-            {activeTab === "bulk" && (
-              <section className="tab-panel" id="bulkPanel" role="tabpanel">
-                <label className="bulk-field" htmlFor="bulkInput">
-                  <span>Paste placeholders and values</span>
-                  <textarea id="bulkInput" value={bulkInput} onChange={(event) => setBulkInput(event.target.value)} disabled={isBusy} />
-                </label>
-                <div className="bulk-actions">
-                  <button type="button" className="secondary-action" onClick={applyBulkInput} disabled={isBusy}>
-                    Autofill Fields
-                  </button>
-                  <button type="button" className="ghost-action" onClick={clearBulkInput} disabled={isBusy}>
-                    Clear Box
-                  </button>
-                </div>
-                <p className={`bulk-result ${bulkResultType}`.trim()}>{bulkResult}</p>
-              </section>
-            )}
-
-            {activeTab === "fields" && (
-              <section className="tab-panel" id="fieldsPanel" role="tabpanel">
-                <form className="field-grid" id="fieldForm" onSubmit={(event) => event.preventDefault()}>
-                  {displayedPlaceholders.map(({ token }) => (
-                    <div className="field-card" key={token}>
-                      <label>
-                        <span>{humanizePlaceholder(token)}</span>
-                        <span className="placeholder-token">{token}</span>
-                        {hasDropdownOptions(token) && (
-                          <select
-                            className="placeholder-select"
-                            value={getDropdownOptions(token).includes(formValues[token] ?? "") ? formValues[token] ?? "" : ""}
-                            onChange={(event) => {
-                              const next = event.target.value;
-                              setFormValues((previous) => ({ ...previous, [token]: next }));
-                            }}
-                            disabled={isBusy}
-                          >
-                            <option value="">Blank / type manually below</option>
-                            {getDropdownOptions(token).map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <textarea
-                          data-placeholder={token}
-                          value={formValues[token] ?? ""}
-                          onChange={(event) => {
-                            const next = isAutomaticDatePlaceholder(token) ? formValues[token] ?? "" : normalizeDateValue(event.target.value);
-                            setFormValues((previous) => ({ ...previous, [token]: next }));
-                          }}
-                          placeholder={hasDropdownOptions(token) ? "Type custom value or choose from dropdown" : ""}
-                          readOnly={isAutomaticDatePlaceholder(token)}
-                          title={isAutomaticDatePlaceholder(token) ? "Filled automatically with today's date" : ""}
-                          autoComplete="off"
-                          spellCheck={false}
-                          disabled={isBusy}
-                        />
-                      </label>
-                    </div>
-                  ))}
-                </form>
-              </section>
-            )}
-          </div>
-        )}
-
-        {displayedPlaceholders.length > 0 && (
-          <div className="actions" id="actions">
-            <button type="button" className="primary-action" onClick={handleDocxDownload} disabled={isBusy}>
+          <div className="mt-5 flex flex-wrap items-center gap-3" id="actions">
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800"
+              onClick={handleDocxDownload}
+              disabled={isBusy}
+            >
               Download MS Word
             </button>
-            <button type="button" className="secondary-action" onClick={handlePdfDownload} disabled={isBusy}>
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-teal-700 bg-white px-4 font-extrabold text-teal-800"
+              onClick={handlePdfDownload}
+              disabled={isBusy}
+            >
               Download PDF
             </button>
-            <button type="button" className="ghost-action" onClick={clearFields} disabled={isBusy}>
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-4 font-extrabold text-slate-600"
+              onClick={clearFields}
+              disabled={isBusy}
+            >
               Clear Fields
             </button>
           </div>
         )}
 
-        <p className={`status ${statusType}`.trim()} role="status" aria-live="polite">
+        <p
+          className={`mt-4 min-h-6 font-bold ${statusType === "error" ? "text-red-700" : statusType === "success" ? "text-teal-800" : "text-slate-500"}`}
+          role="status"
+          aria-live="polite"
+        >
           {status}
         </p>
+
+        <PdfToolsPanel
+          uploadedPdfName={uploadedPdfName}
+          uploadedPdfBuffer={uploadedPdfBuffer}
+          uploadedPdfPreviews={uploadedPdfPreviews}
+          selectedPdfPages={selectedPdfPages}
+          pdfStatus={pdfStatus}
+          pdfStatusType={pdfStatusType}
+          isPdfBusy={isPdfBusy}
+          isBusy={isBusy}
+          onUploadPdf={handleUploadPdf}
+          onClearPdf={clearUploadedPdf}
+          onDeleteSelectedPages={handleDeleteSelectedPdfPages}
+          onTogglePageSelection={togglePdfPageSelection}
+        />
       </section>
 
-      {previewVisible && (
-        <section className="preview-shell" aria-labelledby="previewTitle">
-          <div className="preview-heading">
-            <div>
-              <p className="eyebrow">Preview</p>
-              <h2 id="previewTitle">Generated Document</h2>
-            </div>
-            <span id="previewBadge">{previewBadge}</span>
-          </div>
-          <div className="doc-preview" id="docPreview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        </section>
-      )}
+      <DocumentPreview previewVisible={previewVisible} previewBadge={previewBadge} previewHtml={previewHtml} />
     </main>
   );
 }
