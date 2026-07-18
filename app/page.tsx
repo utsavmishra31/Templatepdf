@@ -6,7 +6,7 @@ import { DocumentPreview } from "@/components/editor/DocumentPreview";
 import { EntryTabs } from "@/components/editor/EntryTabs";
 import { PdfToolsPanel } from "@/components/editor/PdfToolsPanel";
 import { TemplateSelector } from "@/components/editor/TemplateSelector";
-import { deletePdfPages, renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { renderPdfPagePreviews } from "@/lib/pdf-tools";
 import {
   currentOutputName,
   downloadBlob,
@@ -27,6 +27,85 @@ import {
 import type { FormValues, StatusType } from "@/types/editor";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PDF_MIME = "application/pdf";
+
+async function getApiErrorMessage(response: Response, fallbackMessage: string) {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const payload = await response.json() as { message?: string };
+      return payload.message || fallbackMessage;
+    }
+
+    const text = await response.text();
+    return text || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
+
+async function requestWordPreviewPdf(fileName: string, sourceBuffer: ArrayBuffer) {
+  const formData = new FormData();
+  formData.set("file", new File([sourceBuffer.slice(0)], fileName, { type: DOCX_MIME }));
+
+  const response = await fetch("/api/word-preview", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Word preview generation failed."));
+  }
+
+  return response.arrayBuffer();
+}
+
+async function requestPdfPageDeletion(fileName: string, sourceBuffer: ArrayBuffer, selectedPages: number[]) {
+  const formData = new FormData();
+  formData.set("file", new File([sourceBuffer.slice(0)], fileName, { type: PDF_MIME }));
+  formData.set("selectedPages", JSON.stringify(selectedPages));
+
+  const response = await fetch("/api/pdf-delete", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "PDF page deletion failed."));
+  }
+
+  const nextBuffer = await response.arrayBuffer();
+  const removedCount = Number.parseInt(response.headers.get("x-removed-count") || "", 10);
+
+  return {
+    nextBuffer,
+    removedCount: Number.isFinite(removedCount) ? removedCount : selectedPages.length,
+  };
+}
+
+async function requestWordPageDeletion(fileName: string, sourceBuffer: ArrayBuffer, selectedPages: number[]) {
+  const formData = new FormData();
+  formData.set("file", new File([sourceBuffer.slice(0)], fileName, { type: DOCX_MIME }));
+  formData.set("selectedPages", JSON.stringify(selectedPages));
+
+  const response = await fetch("/api/word-delete", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Word page deletion failed."));
+  }
+
+  const nextBuffer = await response.arrayBuffer();
+  const removedCount = Number.parseInt(response.headers.get("x-removed-count") || "", 10);
+
+  return {
+    nextBuffer,
+    removedCount: Number.isFinite(removedCount) ? removedCount : selectedPages.length,
+  };
+}
 
 export default function Home() {
   const [selectedKey, setSelectedKey] = useState<TemplateKey | "">("");
@@ -51,6 +130,16 @@ export default function Home() {
   const [pdfStatus, setPdfStatus] = useState("");
   const [pdfStatusType, setPdfStatusType] = useState<StatusType>("");
   const [isPdfBusy, setIsPdfBusy] = useState(false);
+  const [uploadedWordName, setUploadedWordName] = useState("");
+  const [uploadedWordBuffer, setUploadedWordBuffer] = useState<ArrayBuffer | null>(null);
+  const [uploadedWordOriginalBuffer, setUploadedWordOriginalBuffer] = useState<ArrayBuffer | null>(null);
+  const [uploadedWordPreviews, setUploadedWordPreviews] = useState<string[]>([]);
+  const [selectedWordPages, setSelectedWordPages] = useState<number[]>([]);
+  const [wordVisibleToOriginalPageMap, setWordVisibleToOriginalPageMap] = useState<number[]>([]);
+  const [deletedWordOriginalPages, setDeletedWordOriginalPages] = useState<number[]>([]);
+  const [wordStatus, setWordStatus] = useState("");
+  const [wordStatusType, setWordStatusType] = useState<StatusType>("");
+  const [isWordBusy, setIsWordBusy] = useState(false);
 
   const displayedPlaceholders = useMemo(
     () => getDisplayPlaceholders(selectedKey, placeholders),
@@ -65,6 +154,11 @@ export default function Home() {
   function applyPdfStatus(message: string, type: StatusType) {
     setPdfStatusType(type);
     setPdfStatus(message);
+  }
+
+  function applyWordStatus(message: string, type: StatusType) {
+    setWordStatusType(type);
+    setWordStatus(message);
   }
 
   function resetTemplateState(nextKey: TemplateKey | "") {
@@ -418,12 +512,12 @@ export default function Home() {
     applyPdfStatus("Deleting selected pages...", "");
 
     try {
-      const result = await deletePdfPages(uploadedPdfBuffer, selectedPdfPages);
+      const result = await requestPdfPageDeletion(uploadedPdfName, uploadedPdfBuffer, selectedPdfPages);
       const nextPreviews = await renderPdfPagePreviews(result.nextBuffer);
 
       const baseName = uploadedPdfName.replace(/\.pdf$/i, "") || "edited";
       const outputName = `${baseName}-updated.pdf`;
-      downloadBlob(new Blob([result.bytes], { type: "application/pdf" }), outputName);
+      downloadBlob(new Blob([result.nextBuffer], { type: PDF_MIME }), outputName);
 
       setUploadedPdfName(outputName);
       setUploadedPdfBuffer(result.nextBuffer);
@@ -434,6 +528,155 @@ export default function Home() {
       applyPdfStatus(error instanceof Error ? error.message : "Page deletion failed.", "error");
     } finally {
       setIsPdfBusy(false);
+    }
+  }
+
+  async function handleUploadWord(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const isDocx = file.type === DOCX_MIME || file.name.toLowerCase().endsWith(".docx");
+    if (!isDocx) {
+      applyWordStatus("Please upload a valid DOCX file.", "error");
+      return;
+    }
+
+    setIsWordBusy(true);
+    applyWordStatus("Generating exact Word page previews...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const previewPdfBuffer = await requestWordPreviewPdf(file.name, buffer);
+      const previews = await renderPdfPagePreviews(previewPdfBuffer);
+
+      if (!previews.length) {
+        throw new Error("The uploaded Word file has no previewable pages.");
+      }
+
+      setUploadedWordName(file.name);
+      setUploadedWordBuffer(buffer);
+      setUploadedWordOriginalBuffer(buffer);
+      setUploadedWordPreviews(previews);
+      setSelectedWordPages([]);
+      setWordVisibleToOriginalPageMap(previews.map((_, index) => index + 1));
+      setDeletedWordOriginalPages([]);
+      applyWordStatus(`Loaded ${previews.length} exact Word page(s). Select pages you want to delete.`, "success");
+    } catch (error) {
+      setUploadedWordName("");
+      setUploadedWordBuffer(null);
+      setUploadedWordOriginalBuffer(null);
+      setUploadedWordPreviews([]);
+      setSelectedWordPages([]);
+      setWordVisibleToOriginalPageMap([]);
+      setDeletedWordOriginalPages([]);
+      applyWordStatus(error instanceof Error ? error.message : "Could not process this Word file.", "error");
+    } finally {
+      setIsWordBusy(false);
+    }
+  }
+
+  function clearUploadedWord() {
+    setUploadedWordName("");
+    setUploadedWordBuffer(null);
+    setUploadedWordOriginalBuffer(null);
+    setUploadedWordPreviews([]);
+    setSelectedWordPages([]);
+    setWordVisibleToOriginalPageMap([]);
+    setDeletedWordOriginalPages([]);
+    applyWordStatus("Word selection cleared.", "success");
+  }
+
+  function toggleWordPageSelection(pageNumber: number) {
+    setSelectedWordPages((previous) => {
+      if (previous.includes(pageNumber)) {
+        return previous.filter((item) => item !== pageNumber);
+      }
+
+      return [...previous, pageNumber].sort((a, b) => a - b);
+    });
+  }
+
+  async function handleDeleteSelectedWordPages() {
+    if (!uploadedWordBuffer || !uploadedWordName) {
+      applyWordStatus("Upload a Word file first.", "error");
+      return;
+    }
+
+    if (!selectedWordPages.length) {
+      applyWordStatus("Select at least one page to delete.", "error");
+      return;
+    }
+
+    setIsWordBusy(true);
+    applyWordStatus("Deleting selected Word pages...", "");
+
+    try {
+      const selectedCurrentSet = new Set(selectedWordPages);
+      const mappedOriginalPages = selectedWordPages
+        .map((visiblePageNumber) => wordVisibleToOriginalPageMap[visiblePageNumber - 1])
+        .filter((pageNumber): pageNumber is number => Number.isFinite(pageNumber));
+
+      const canUseOriginalMapping =
+        !!uploadedWordOriginalBuffer &&
+        mappedOriginalPages.length === selectedWordPages.length;
+
+      const nextDeletedOriginalPages = canUseOriginalMapping
+        ? Array.from(new Set([
+          ...deletedWordOriginalPages,
+          ...mappedOriginalPages,
+        ])).sort((a, b) => a - b)
+        : [];
+
+      // Prefer deleting from the stable original source. If mapping drifts,
+      // fall back to current buffer and rebase mapping automatically.
+      const result = canUseOriginalMapping
+        ? await requestWordPageDeletion(uploadedWordName, uploadedWordOriginalBuffer, nextDeletedOriginalPages)
+        : await requestWordPageDeletion(uploadedWordName, uploadedWordBuffer, selectedWordPages);
+      const nextBuffer = result.nextBuffer;
+
+      const baseName = uploadedWordName.replace(/\.docx$/i, "") || "edited";
+      const outputName = `${baseName}-updated.docx`;
+      const previewPdfBuffer = await requestWordPreviewPdf(outputName, nextBuffer);
+      const nextPreviews = await renderPdfPagePreviews(previewPdfBuffer);
+      let nextVisibleToOriginalMap = canUseOriginalMapping
+        ? wordVisibleToOriginalPageMap.filter((_, index) => !selectedCurrentSet.has(index + 1))
+        : nextPreviews.map((_, index) => index + 1);
+
+      const hasMappingDrift = canUseOriginalMapping && nextVisibleToOriginalMap.length !== nextPreviews.length;
+
+      if (hasMappingDrift) {
+        nextVisibleToOriginalMap = nextPreviews.map((_, index) => index + 1);
+      }
+
+      const newlyDeletedCount = canUseOriginalMapping
+        ? nextDeletedOriginalPages.length - deletedWordOriginalPages.length
+        : selectedWordPages.length;
+
+      downloadBlob(new Blob([nextBuffer], { type: DOCX_MIME }), outputName);
+
+      setUploadedWordName(outputName);
+      setUploadedWordBuffer(nextBuffer);
+      setUploadedWordOriginalBuffer((canUseOriginalMapping && !hasMappingDrift) ? uploadedWordOriginalBuffer : nextBuffer);
+      setUploadedWordPreviews(nextPreviews);
+      setSelectedWordPages([]);
+      setWordVisibleToOriginalPageMap(nextVisibleToOriginalMap);
+      setDeletedWordOriginalPages((canUseOriginalMapping && !hasMappingDrift) ? nextDeletedOriginalPages : []);
+
+      const rebased = !canUseOriginalMapping || hasMappingDrift;
+      applyWordStatus(
+        rebased
+          ? `Deleted ${newlyDeletedCount} page(s). Downloaded ${outputName}. Page mapping was auto-reset for continued edits.`
+          : `Deleted ${newlyDeletedCount} page(s). Downloaded ${outputName}.`,
+        "success",
+      );
+    } catch (error) {
+      applyWordStatus(error instanceof Error ? error.message : "Word page deletion failed.", "error");
+    } finally {
+      setIsWordBusy(false);
     }
   }
 
@@ -510,11 +753,22 @@ export default function Home() {
           pdfStatus={pdfStatus}
           pdfStatusType={pdfStatusType}
           isPdfBusy={isPdfBusy}
+          uploadedWordName={uploadedWordName}
+          uploadedWordBuffer={uploadedWordBuffer}
+          uploadedWordPreviews={uploadedWordPreviews}
+          selectedWordPages={selectedWordPages}
+          wordStatus={wordStatus}
+          wordStatusType={wordStatusType}
+          isWordBusy={isWordBusy}
           isBusy={isBusy}
           onUploadPdf={handleUploadPdf}
           onClearPdf={clearUploadedPdf}
           onDeleteSelectedPages={handleDeleteSelectedPdfPages}
           onTogglePageSelection={togglePdfPageSelection}
+          onUploadWord={handleUploadWord}
+          onClearWord={clearUploadedWord}
+          onDeleteSelectedWordPages={handleDeleteSelectedWordPages}
+          onToggleWordPageSelection={toggleWordPageSelection}
         />
       </section>
 
