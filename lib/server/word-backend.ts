@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -67,6 +67,52 @@ export async function generateWordPreviewPdf(sourceBuffer: ArrayBuffer | Uint8Ar
       throw new Error(message.trim() || "Word preview generation failed.");
     }
 
+    return readFile(outputPath);
+  });
+}
+
+/**
+ * Round-trip a DOCX through LibreOffice's layout engine.
+ *
+ * LibreOffice writes `w:lastRenderedPageBreak` elements during DOCX export,
+ * marking exactly where its renderer placed each page break.  Our XML-level
+ * page splitter already reads those markers, so after enrichment it reflects
+ * LibreOffice's true pagination rather than a heuristic one.
+ *
+ * Throws if LibreOffice is unavailable or conversion fails — callers should
+ * fall back to the original buffer in that case.
+ */
+export async function enrichDocxWithPageMarkers(
+  sourceBuffer: ArrayBuffer | Uint8Array,
+): Promise<Buffer> {
+  return withTempDir(async (directory) => {
+    const inputPath = join(directory, "lo-source.docx");
+    const outputDir = join(directory, "lo-output");
+    const profilePath = join(directory, "lo-profile");
+
+    await writeFile(inputPath, toBuffer(sourceBuffer));
+    await mkdir(outputDir, { recursive: true });
+
+    await execFileAsync(
+      "soffice",
+      [
+        "--headless",
+        `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
+        "--convert-to",
+        "docx:MS Word 2007 XML",
+        "--outdir",
+        outputDir,
+        inputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 60_000,
+      },
+    );
+
+    // LibreOffice names the output file using the input basename.
+    const outputPath = join(outputDir, "lo-source.docx");
     return readFile(outputPath);
   });
 }

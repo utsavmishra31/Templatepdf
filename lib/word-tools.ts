@@ -1,5 +1,8 @@
+import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
+
 const WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const ELEMENT_NODE = 1;
+const MAX_DOCX_BYTES = 50 * 1024 * 1024; // 50 MB
 
 type WordPageFragment = {
   element: Element;
@@ -173,21 +176,24 @@ function splitBodyElementIntoPages(element: Element): WordPageFragment[] {
 
 function parseWordDocument(sourceXml: string) {
   const parser = new DOMParser();
-  const document = parser.parseFromString(sourceXml, "application/xml");
-  const parserError = document.querySelector?.("parsererror")
-    ?? document.getElementsByTagName("parsererror")[0]
-    ?? null;
+  const xmlDoc = parser.parseFromString(sourceXml, "application/xml");
+  const parserError = xmlDoc.getElementsByTagName("parsererror")[0] ?? null;
 
   if (parserError) {
     throw new Error("The Word document XML could not be parsed.");
   }
 
-  const body = document.getElementsByTagNameNS(WORD_NAMESPACE, "body")[0];
+  const body = xmlDoc.getElementsByTagNameNS(WORD_NAMESPACE, "body")[0];
   if (!body) {
     throw new Error("The Word document body is missing.");
   }
 
-  return { document, body };
+  // Keep raw xmldom document for serialization; cast body to browser DOM types
+  // for internal helpers whose runtime API surface is identical.
+  return {
+    xmlDoc,
+    body: body as unknown as Element,
+  };
 }
 
 function extractWordPages(body: Element) {
@@ -221,7 +227,15 @@ function extractWordPages(body: Element) {
   };
 }
 
-export async function deleteWordPages(sourceBuffer: ArrayBuffer, selectedPages: number[]) {
+export async function deleteWordPages(sourceBuffer: ArrayBuffer | Buffer | Uint8Array, selectedPages: number[]) {
+  if (sourceBuffer.byteLength > MAX_DOCX_BYTES) {
+    throw new Error("The DOCX file is too large to process (limit: 50 MB).");
+  }
+
+  if (!selectedPages.length) {
+    throw new Error("Select at least one page to delete.");
+  }
+
   const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(sourceBuffer.slice(0));
   const documentFile = zip.file("word/document.xml");
@@ -231,11 +245,18 @@ export async function deleteWordPages(sourceBuffer: ArrayBuffer, selectedPages: 
   }
 
   const sourceXml = await documentFile.async("string");
-  const { document, body } = parseWordDocument(sourceXml);
+  const { xmlDoc, body } = parseWordDocument(sourceXml);
   const { pages, trailingSectionProperties } = extractWordPages(body);
 
   if (pages.length <= 1) {
-    throw new Error("This Word file does not expose removable page boundaries. Add explicit page or section breaks in Word, then upload it again.");
+    throw new Error(
+      "This Word file has no explicit page breaks or section breaks. Open the file in Microsoft Word, insert a Page Break (Ctrl+Enter) between pages, save, and re-upload.",
+    );
+  }
+
+  const outOfRange = selectedPages.filter((p) => p < 1 || p > pages.length);
+  if (outOfRange.length) {
+    throw new Error(`Page number(s) out of range: ${outOfRange.join(", ")}. The document has ${pages.length} page(s).`);
   }
 
   if (selectedPages.length >= pages.length) {
@@ -244,37 +265,35 @@ export async function deleteWordPages(sourceBuffer: ArrayBuffer, selectedPages: 
 
   const deleteSet = new Set(selectedPages);
   const remainingPages = pages.filter((_, index) => !deleteSet.has(index + 1));
-
-  if (!remainingPages.length) {
-    throw new Error("You cannot delete all pages. Keep at least one page.");
-  }
+  const isLastPageDeleted = deleteSet.has(pages.length);
 
   while (body.firstChild) {
     body.removeChild(body.firstChild);
   }
 
+  // Elements are already cloned inside splitBodyElementIntoPages — append directly.
   remainingPages.flat().forEach((node) => {
-    body.appendChild(node.cloneNode(true));
+    body.appendChild(node);
   });
 
-  if (trailingSectionProperties) {
-    body.appendChild(trailingSectionProperties.cloneNode(true));
+  // Only restore trailing sectPr if the last original page survived deletion.
+  // If the last page was deleted, the new last page already carries its own sectPr
+  // from the DOCX content, so re-attaching the old one would duplicate it.
+  if (trailingSectionProperties && !isLastPageDeleted) {
+    body.appendChild(trailingSectionProperties);
   }
 
   const serializer = new XMLSerializer();
-  zip.file("word/document.xml", serializer.serializeToString(document));
+  zip.file("word/document.xml", serializer.serializeToString(xmlDoc));
 
-  const nextBlob = await zip.generateAsync({
-    type: "blob",
+  const bytes = await zip.generateAsync({
+    type: "uint8array",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     compression: "DEFLATE",
   });
-  const nextBuffer = await nextBlob.arrayBuffer();
-  const bytes = new Uint8Array(nextBuffer.slice(0));
 
   return {
     bytes,
-    nextBuffer,
     removedCount: deleteSet.size,
   };
 }

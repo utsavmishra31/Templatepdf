@@ -656,11 +656,11 @@ export default function Home() {
         ? nextDeletedOriginalPages.length - deletedWordOriginalPages.length
         : selectedWordPages.length;
 
-      downloadBlob(new Blob([nextBuffer], { type: DOCX_MIME }), outputName);
+      downloadBlob(new Blob([result.nextBuffer], { type: DOCX_MIME }), outputName);
 
       setUploadedWordName(outputName);
-      setUploadedWordBuffer(nextBuffer);
-      setUploadedWordOriginalBuffer((canUseOriginalMapping && !hasMappingDrift) ? uploadedWordOriginalBuffer : nextBuffer);
+      setUploadedWordBuffer(result.nextBuffer);
+      setUploadedWordOriginalBuffer((canUseOriginalMapping && !hasMappingDrift) ? uploadedWordOriginalBuffer : result.nextBuffer);
       setUploadedWordPreviews(nextPreviews);
       setSelectedWordPages([]);
       setWordVisibleToOriginalPageMap(nextVisibleToOriginalMap);

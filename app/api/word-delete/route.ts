@@ -1,23 +1,12 @@
 import { NextResponse } from "next/server";
-import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
+import { enrichDocxWithPageMarkers } from "@/lib/server/word-backend";
 import { deleteWordPages } from "@/lib/word-tools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-function ensureDomGlobals() {
-  const globalWithDom = globalThis as unknown as Record<string, unknown>;
-
-  if (!globalWithDom.DOMParser) {
-    globalWithDom.DOMParser = DOMParser;
-  }
-
-  if (!globalWithDom.XMLSerializer) {
-    globalWithDom.XMLSerializer = XMLSerializer;
-  }
-}
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function parseSelectedPages(rawValue: FormDataEntryValue | null): number[] {
   if (typeof rawValue !== "string") {
@@ -44,8 +33,6 @@ function parseSelectedPages(rawValue: FormDataEntryValue | null): number[] {
 
 export async function POST(request: Request) {
   try {
-    ensureDomGlobals();
-
     const formData = await request.formData();
     const file = formData.get("file");
     const selectedPages = parseSelectedPages(formData.get("selectedPages"));
@@ -59,12 +46,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please upload a valid DOCX file." }, { status: 400 });
     }
 
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ message: "File is too large. Maximum allowed size is 50 MB." }, { status: 413 });
+    }
+
     if (!selectedPages.length) {
       return NextResponse.json({ message: "Select at least one page to delete." }, { status: 400 });
     }
 
     const sourceBuffer = await file.arrayBuffer();
-    const result = await deleteWordPages(sourceBuffer, selectedPages);
+
+    // Attempt to enrich the DOCX via LibreOffice so that its layout engine
+    // writes `w:lastRenderedPageBreak` markers.  Our page splitter already
+    // reads those, turning a heuristic into a true layout-aware detection.
+    // Fall back to the original buffer if LibreOffice is unavailable.
+    let workingBuffer: ArrayBuffer | Buffer = sourceBuffer;
+    try {
+      workingBuffer = await enrichDocxWithPageMarkers(sourceBuffer);
+    } catch {
+      // LibreOffice enrichment unavailable — proceed with original DOCX.
+    }
+
+    const result = await deleteWordPages(workingBuffer, selectedPages);
 
     return new Response(Buffer.from(result.bytes), {
       headers: {
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Word page deletion failed.";
-    return NextResponse.json({ message }, { status: 500 });
+    const status = message.includes("too large") ? 413 : 500;
+    return NextResponse.json({ message }, { status });
   }
 }
