@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ChangeEvent } from "react";
 import type { StatusType } from "@/types/editor";
 
@@ -59,7 +60,7 @@ type PdfToolsPanelProps = {
   isMergePdfBusy: boolean;
   onAddMergePdfFiles: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemoveMergePdfFile: (index: number) => void;
-  onMoveMergePdfFile: (index: number, direction: "up" | "down") => void;
+  onMoveMergePdfFile: (fromIndex: number, toIndex: number) => void;
   onMergePdfs: () => void;
   onClearMergePdf: () => void;
   onDownloadMergedPdf: () => void;
@@ -189,6 +190,8 @@ export function PdfToolsPanel({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
+  const [dragSrc, setDragSrc] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   return (
     <section className="mt-6 border-t border-dashed border-slate-300 pt-5" aria-labelledby="pdfToolsTitle">
       <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
@@ -617,52 +620,62 @@ export function PdfToolsPanel({
         </div>
 
         {mergePdfFiles.length > 0 && (
-          <div className="mt-4 flex flex-col gap-2">
-            {mergePdfFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                {file.firstPageSrc && (
-                  <img
-                    src={file.firstPageSrc}
-                    alt=""
-                    className="h-16 w-12 shrink-0 rounded border border-slate-200 bg-slate-50 object-cover"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold text-slate-800">{file.name}</div>
-                  <div className="text-xs text-slate-500">{file.pageCount} page(s)</div>
+          <>
+            <p className="mt-3 text-xs text-slate-400">Drag cards to reorder</p>
+            <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+              {mergePdfFiles.map((file, index) => (
+                <div
+                  key={index}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; setDragSrc(index); }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(index); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragSrc !== null && dragSrc !== index) onMoveMergePdfFile(dragSrc, index);
+                    setDragSrc(null);
+                    setDragOver(null);
+                  }}
+                  onDragEnd={() => { setDragSrc(null); setDragOver(null); }}
+                  onDragLeave={() => setDragOver(null)}
+                  className={`cursor-grab select-none rounded-lg border-2 bg-white p-2 active:cursor-grabbing ${
+                    dragSrc === index
+                      ? "opacity-40 border-slate-300"
+                      : dragOver === index
+                      ? "border-teal-500 bg-teal-50"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <div className="relative">
+                    {file.firstPageSrc ? (
+                      <img
+                        src={file.firstPageSrc}
+                        alt={`Page 1 of ${file.name}`}
+                        className="h-auto w-full rounded border border-slate-100 bg-slate-50"
+                      />
+                    ) : (
+                      <div className="flex h-28 items-center justify-center rounded bg-slate-100 text-xs text-slate-400">No preview</div>
+                    )}
+                    <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-bold text-white">
+                      {index + 1}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Remove"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded bg-black/60 text-xs text-white hover:bg-red-500 disabled:opacity-40"
+                      onClick={() => onRemoveMergePdfFile(index)}
+                      disabled={isMergePdfBusy || isBusy}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-1.5">
+                    <div className="truncate text-xs font-bold text-slate-800" title={file.name}>{file.name}</div>
+                    <div className="text-xs text-slate-400">{file.pageCount} page(s)</div>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30"
-                    onClick={() => onMoveMergePdfFile(index, "up")}
-                    disabled={index === 0 || isMergePdfBusy || isBusy}
-                    aria-label="Move up"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30"
-                    onClick={() => onMoveMergePdfFile(index, "down")}
-                    disabled={index === mergePdfFiles.length - 1 || isMergePdfBusy || isBusy}
-                    aria-label="Move down"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-30"
-                    onClick={() => onRemoveMergePdfFile(index)}
-                    disabled={isMergePdfBusy || isBusy}
-                    aria-label="Remove"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
 
         <p

@@ -969,12 +969,12 @@ export default function Home() {
     setMergePdfResultName("");
   }
 
-  function handleMoveMergePdfFile(index: number, direction: "up" | "down") {
+  function handleMoveMergePdfFile(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
     setMergePdfFiles((prev) => {
       const next = [...prev];
-      const swapWith = direction === "up" ? index - 1 : index + 1;
-      if (swapWith < 0 || swapWith >= next.length) return prev;
-      [next[index], next[swapWith]] = [next[swapWith], next[index]];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
       return next;
     });
     setMergePdfResultBuffer(null);
