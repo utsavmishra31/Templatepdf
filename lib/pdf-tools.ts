@@ -46,6 +46,48 @@ export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer): Promise<
   return previews;
 }
 
+export async function compressPdfToBuffer(
+  sourceBuffer: ArrayBuffer,
+  level: "extreme" | "recommended" | "less",
+): Promise<Uint8Array> {
+  const LEVELS = {
+    extreme:     { scale: 1.0, jpegQuality: 0.40 },
+    recommended: { scale: 1.5, jpegQuality: 0.70 },
+    less:        { scale: 2.0, jpegQuality: 0.88 },
+  } as const;
+  const { scale, jpegQuality } = LEVELS[level];
+
+  const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+
+  const { PDFDocument } = await import("pdf-lib");
+
+  const pdf = await pdfjs.getDocument({ data: sourceBuffer.slice(0) }).promise;
+  const newPdf = await PDFDocument.create();
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
+
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const dataUrl = canvas.toDataURL("image/jpeg", jpegQuality);
+    const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    const jpegBytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const jpegImage = await newPdf.embedJpg(jpegBytes);
+    const newPage = newPdf.addPage([canvas.width, canvas.height]);
+    newPage.drawImage(jpegImage, { x: 0, y: 0, width: canvas.width, height: canvas.height });
+  }
+
+  return newPdf.save({ useObjectStreams: true });
+}
+
 export async function deletePdfPages(sourceBuffer: ArrayBuffer, selectedPages: number[]) {
   const { PDFDocument } = await import("pdf-lib");
   const source = await PDFDocument.load(sourceBuffer.slice(0));

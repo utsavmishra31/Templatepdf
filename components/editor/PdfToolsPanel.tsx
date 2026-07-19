@@ -63,6 +63,21 @@ type PdfToolsPanelProps = {
   onMergePdfs: () => void;
   onClearMergePdf: () => void;
   onDownloadMergedPdf: () => void;
+  compressPdfName: string;
+  compressPdfBuffer: ArrayBuffer | null;
+  compressPdfOriginalSize: number;
+  compressPdfQuality: "extreme" | "recommended" | "less";
+  compressPdfResultBuffer: ArrayBuffer | null;
+  compressPdfResultName: string;
+  compressPdfResultSize: number;
+  compressPdfStatus: string;
+  compressPdfStatusType: StatusType;
+  isCompressPdfBusy: boolean;
+  onUploadCompressPdf: (event: ChangeEvent<HTMLInputElement>) => void;
+  onClearCompressPdf: () => void;
+  onCompressPdfQualityChange: (quality: "extreme" | "recommended" | "less") => void;
+  onCompressPdf: () => void;
+  onDownloadCompressedPdf: () => void;
 };
 
 export function PdfToolsPanel({
@@ -127,7 +142,27 @@ export function PdfToolsPanel({
   onMergePdfs,
   onClearMergePdf,
   onDownloadMergedPdf,
+  compressPdfName,
+  compressPdfBuffer,
+  compressPdfOriginalSize,
+  compressPdfQuality,
+  compressPdfResultBuffer,
+  compressPdfResultName,
+  compressPdfResultSize,
+  compressPdfStatus,
+  compressPdfStatusType,
+  isCompressPdfBusy,
+  onUploadCompressPdf,
+  onClearCompressPdf,
+  onCompressPdfQualityChange,
+  onCompressPdf,
+  onDownloadCompressedPdf,
 }: PdfToolsPanelProps) {
+  function fmt(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
   return (
     <section className="mt-6 border-t border-dashed border-slate-300 pt-5" aria-labelledby="pdfToolsTitle">
       <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
@@ -626,6 +661,124 @@ export function PdfToolsPanel({
             </button>
             {mergePdfResultName && (
               <div className="text-sm font-bold text-slate-500">{mergePdfResultName}</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Compress PDF ────────────────────────────────────────── */}
+      <div className="mt-8 border-t border-dashed border-slate-300 pt-5">
+        <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-teal-800">PDF Utilities</p>
+            <h3 className="font-[var(--font-newsreader)] text-2xl font-semibold text-slate-900">
+              Compress PDF
+            </h3>
+          </div>
+          <span className="inline-flex min-h-[34px] items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-sm font-bold text-orange-700">
+            Compress PDF
+          </span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label className="relative inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-teal-700 bg-white px-4 font-extrabold text-teal-800">
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={onUploadCompressPdf}
+              disabled={isCompressPdfBusy || isBusy}
+              className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-progress"
+            />
+            Upload PDF
+          </label>
+          <button
+            type="button"
+            className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-4 font-extrabold text-slate-600"
+            onClick={onClearCompressPdf}
+            disabled={isCompressPdfBusy || isBusy || !compressPdfBuffer}
+          >
+            Clear
+          </button>
+          {compressPdfName && (
+            <div className="text-sm font-bold text-slate-500">
+              {compressPdfName}{compressPdfOriginalSize > 0 ? ` • ${fmt(compressPdfOriginalSize)}` : ""}
+            </div>
+          )}
+        </div>
+
+        {compressPdfBuffer && (
+          <>
+            <div className="mt-5">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Compression Level</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+                {([
+                  { value: "extreme",     label: "Extreme Compression",     note: "Less quality, high compression" },
+                  { value: "recommended", label: "Recommended Compression", note: "Good quality, good compression" },
+                  { value: "less",        label: "Less Compression",        note: "High quality, less compression" },
+                ] as const).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                      compressPdfQuality === opt.value
+                        ? "border-teal-700 bg-teal-50 shadow-[0_0_0_2px_rgba(15,118,110,0.12)]"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="compressQuality"
+                      value={opt.value}
+                      checked={compressPdfQuality === opt.value}
+                      onChange={() => onCompressPdfQualityChange(opt.value)}
+                      disabled={isCompressPdfBusy || isBusy}
+                      className="mt-0.5 accent-teal-700"
+                    />
+                    <span>
+                      <span className="block text-sm font-bold text-slate-800">{opt.label}</span>
+                      <span className="block text-xs text-slate-500">{opt.note}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800 disabled:opacity-50"
+                onClick={onCompressPdf}
+                disabled={isCompressPdfBusy || isBusy}
+              >
+                Compress PDF
+              </button>
+            </div>
+          </>
+        )}
+
+        <p
+          className={`mt-4 min-h-6 font-bold ${
+            compressPdfStatusType === "error" ? "text-red-700" : compressPdfStatusType === "success" ? "text-teal-800" : "text-slate-500"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          {compressPdfStatus}
+        </p>
+
+        {compressPdfResultBuffer && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800"
+              onClick={onDownloadCompressedPdf}
+              disabled={isCompressPdfBusy || isBusy}
+            >
+              Download PDF
+            </button>
+            {compressPdfResultName && (
+              <div className="text-sm font-bold text-slate-500">
+                {compressPdfResultName}{compressPdfResultSize > 0 ? ` • ${fmt(compressPdfResultSize)}` : ""}
+              </div>
             )}
           </div>
         )}
