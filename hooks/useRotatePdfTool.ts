@@ -49,10 +49,7 @@ export function useRotatePdfTool() {
       setRotatePdfName(file.name);
       setRotatePdfBuffer(buffer);
       setRotatePdfPreviews(previews);
-      applyRotatePdfStatus(
-        `${file.name} • ${previews.length} page(s). Use ↻ / ↺ on each page to rotate.`,
-        "success",
-      );
+      applyRotatePdfStatus("", "");
     } catch (error) {
       setRotatePdfName("");
       setRotatePdfBuffer(null);

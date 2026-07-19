@@ -71,7 +71,7 @@ export function RotatePdfPanel({
         </button>
         {rotatePdfName && (
           <div className="text-sm font-bold text-slate-500">
-            {rotatePdfName} • {rotatePdfPreviews.length} page(s)
+            {rotatePdfName}
           </div>
         )}
       </div>

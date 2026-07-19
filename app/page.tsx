@@ -166,6 +166,23 @@ const tools = [
       </svg>
     ),
   },
+  {
+    href: "/rearrange-pdf",
+    title: "Rearrange PDF Pages",
+    description: "Drag and drop pages to reorder them, then download the new PDF.",
+    badge: "Rearrange",
+    badgeColor: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100",
+    iconBg: "bg-fuchsia-50",
+    iconColor: "text-fuchsia-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l4-4 4 4"/>
+        <path d="M7 5v14"/>
+        <path d="M21 15l-4 4-4-4"/>
+        <path d="M17 19V5"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function DashboardPage() {
