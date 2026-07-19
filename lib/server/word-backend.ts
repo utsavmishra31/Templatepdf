@@ -121,4 +121,45 @@ export async function enrichDocxWithPageMarkers(
   });
 }
 
+/**
+ * Convert a PDF to DOCX using LibreOffice's built-in PDF import filter.
+ *
+ * Text-based PDFs convert well. Scanned/image-only PDFs will be embedded as
+ * images inside the DOCX — an OCR step would be required for editable text.
+ *
+ * Throws if LibreOffice is unavailable or the PDF cannot be processed.
+ */
+export async function convertPdfToDocx(sourceBuffer: ArrayBuffer | Uint8Array): Promise<Buffer> {
+  return withTempDir(async (directory) => {
+    const inputPath = join(directory, "input.pdf");
+    const outputDir = join(directory, "output");
+    const profilePath = join(directory, "lo-profile");
+
+    await writeFile(inputPath, toBuffer(sourceBuffer));
+    await mkdir(outputDir, { recursive: true });
+
+    await execFileAsync(
+      "soffice",
+      [
+        "--headless",
+        `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
+        "--infilter=writer_pdf_import",
+        "--convert-to",
+        "docx:MS Word 2007 XML",
+        "--outdir",
+        outputDir,
+        inputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 120_000,
+      },
+    );
+
+    const outputPath = join(outputDir, "input.docx");
+    return readFile(outputPath);
+  });
+}
+
 export { DOCX_MIME };

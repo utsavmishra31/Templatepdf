@@ -107,6 +107,22 @@ async function requestWordPageDeletion(fileName: string, sourceBuffer: ArrayBuff
   };
 }
 
+async function requestPdfToWordConversion(fileName: string, sourceBuffer: ArrayBuffer) {
+  const formData = new FormData();
+  formData.set("file", new File([sourceBuffer.slice(0)], fileName, { type: "application/pdf" }));
+
+  const response = await fetch("/api/pdf-to-word", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "PDF to Word conversion failed."));
+  }
+
+  return response.arrayBuffer();
+}
+
 export default function Home() {
   const [selectedKey, setSelectedKey] = useState<TemplateKey | "">("");
   const [templateBuffer, setTemplateBuffer] = useState<ArrayBuffer | null>(null);
@@ -150,6 +166,15 @@ export default function Home() {
   const [wordToPdfPreviews, setWordToPdfPreviews] = useState<string[]>([]);
   const [wordToPdfResultName, setWordToPdfResultName] = useState("");
 
+  const [pdfToWordName, setPdfToWordName] = useState("");
+  const [pdfToWordBuffer, setPdfToWordBuffer] = useState<ArrayBuffer | null>(null);
+  const [pdfToWordPreviews, setPdfToWordPreviews] = useState<string[]>([]);
+  const [pdfToWordResultBuffer, setPdfToWordResultBuffer] = useState<ArrayBuffer | null>(null);
+  const [pdfToWordResultName, setPdfToWordResultName] = useState("");
+  const [pdfToWordStatus, setPdfToWordStatus] = useState("");
+  const [pdfToWordStatusType, setPdfToWordStatusType] = useState<StatusType>("");
+  const [isPdfToWordBusy, setIsPdfToWordBusy] = useState(false);
+
   const displayedPlaceholders = useMemo(
     () => getDisplayPlaceholders(selectedKey, placeholders),
     [selectedKey, placeholders],
@@ -173,6 +198,11 @@ export default function Home() {
   function applyWordToPdfStatus(message: string, type: StatusType) {
     setWordToPdfStatusType(type);
     setWordToPdfStatus(message);
+  }
+
+  function applyPdfToWordStatus(message: string, type: StatusType) {
+    setPdfToWordStatusType(type);
+    setPdfToWordStatus(message);
   }
 
   function resetTemplateState(nextKey: TemplateKey | "") {
@@ -728,7 +758,7 @@ export default function Home() {
     setWordToPdfResultBuffer(null);
     setWordToPdfPreviews([]);
     setWordToPdfResultName("");
-    applyWordToPdfStatus("Converting to PDF via LibreOffice...", "");
+    applyWordToPdfStatus("Converting to PDF...", "");
 
     try {
       const pdfBuffer = await requestWordPreviewPdf(wordToPdfName, wordToPdfBuffer);
@@ -759,6 +789,78 @@ export default function Home() {
   function handleDownloadWordToPdf() {
     if (!wordToPdfResultBuffer || !wordToPdfResultName) return;
     downloadBlob(new Blob([wordToPdfResultBuffer], { type: PDF_MIME }), wordToPdfResultName);
+  }
+
+  async function handleUploadPdfToWord(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      applyPdfToWordStatus("Please upload a valid PDF file.", "error");
+      return;
+    }
+
+    setIsPdfToWordBusy(true);
+    setPdfToWordResultBuffer(null);
+    setPdfToWordResultName("");
+    applyPdfToWordStatus("Reading PDF...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const previews = await renderPdfPagePreviews(buffer);
+      setPdfToWordName(file.name);
+      setPdfToWordBuffer(buffer);
+      setPdfToWordPreviews(previews);
+      applyPdfToWordStatus(`${file.name} • ${previews.length} page(s). Click Convert to Word to proceed.`, "success");
+    } catch (error) {
+      setPdfToWordName("");
+      setPdfToWordBuffer(null);
+      setPdfToWordPreviews([]);
+      applyPdfToWordStatus(error instanceof Error ? error.message : "Could not read this PDF.", "error");
+    } finally {
+      setIsPdfToWordBusy(false);
+    }
+  }
+
+  function clearPdfToWord() {
+    setPdfToWordName("");
+    setPdfToWordBuffer(null);
+    setPdfToWordPreviews([]);
+    setPdfToWordResultBuffer(null);
+    setPdfToWordResultName("");
+    applyPdfToWordStatus("Cleared.", "success");
+  }
+
+  async function handleConvertPdfToWord() {
+    if (!pdfToWordBuffer || !pdfToWordName) {
+      applyPdfToWordStatus("Upload a PDF first.", "error");
+      return;
+    }
+
+    setIsPdfToWordBusy(true);
+    setPdfToWordResultBuffer(null);
+    setPdfToWordResultName("");
+    applyPdfToWordStatus("Converting to Word...", "");
+
+    try {
+      const docxBuffer = await requestPdfToWordConversion(pdfToWordName, pdfToWordBuffer);
+      const baseName = pdfToWordName.replace(/\.pdf$/i, "") || "document";
+      const outputName = `${baseName}.docx`;
+      setPdfToWordResultBuffer(docxBuffer);
+      setPdfToWordResultName(outputName);
+      applyPdfToWordStatus(`Converted successfully. Click Download Word to save.`, "success");
+    } catch (error) {
+      applyPdfToWordStatus(error instanceof Error ? error.message : "Conversion failed.", "error");
+    } finally {
+      setIsPdfToWordBusy(false);
+    }
+  }
+
+  function handleDownloadPdfToWord() {
+    if (!pdfToWordResultBuffer || !pdfToWordResultName) return;
+    downloadBlob(new Blob([pdfToWordResultBuffer], { type: DOCX_MIME }), pdfToWordResultName);
   }
 
   const selectedTemplateLabel = selectedKey ? templateOptions[selectedKey].label : "";
@@ -864,6 +966,18 @@ export default function Home() {
           onDownloadPdf={handleDownloadPdf}
           onDownloadWord={handleDownloadWord}
           onDownloadWordToPdf={handleDownloadWordToPdf}
+          pdfToWordName={pdfToWordName}
+          pdfToWordBuffer={pdfToWordBuffer}
+          pdfToWordPreviews={pdfToWordPreviews}
+          pdfToWordResultBuffer={pdfToWordResultBuffer}
+          pdfToWordResultName={pdfToWordResultName}
+          pdfToWordStatus={pdfToWordStatus}
+          pdfToWordStatusType={pdfToWordStatusType}
+          isPdfToWordBusy={isPdfToWordBusy}
+          onUploadPdfToWord={handleUploadPdfToWord}
+          onClearPdfToWord={clearPdfToWord}
+          onConvertPdfToWord={handleConvertPdfToWord}
+          onDownloadPdfToWord={handleDownloadPdfToWord}
         />
       </section>
 
