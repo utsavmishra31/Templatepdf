@@ -219,6 +219,15 @@ export default function Home() {
   const [compressPdfStatusType, setCompressPdfStatusType] = useState<StatusType>("");
   const [isCompressPdfBusy, setIsCompressPdfBusy] = useState(false);
 
+  const [rotatePdfName, setRotatePdfName] = useState("");
+  const [rotatePdfBuffer, setRotatePdfBuffer] = useState<ArrayBuffer | null>(null);
+  const [rotatePdfPreviews, setRotatePdfPreviews] = useState<string[]>([]);
+  const [rotatePdfResultBuffer, setRotatePdfResultBuffer] = useState<ArrayBuffer | null>(null);
+  const [rotatePdfResultName, setRotatePdfResultName] = useState("");
+  const [rotatePdfStatus, setRotatePdfStatus] = useState("");
+  const [rotatePdfStatusType, setRotatePdfStatusType] = useState<StatusType>("");
+  const [isRotatePdfBusy, setIsRotatePdfBusy] = useState(false);
+
   const displayedPlaceholders = useMemo(
     () => getDisplayPlaceholders(selectedKey, placeholders),
     [selectedKey, placeholders],
@@ -257,6 +266,11 @@ export default function Home() {
   function applyCompressPdfStatus(message: string, type: StatusType) {
     setCompressPdfStatusType(type);
     setCompressPdfStatus(message);
+  }
+
+  function applyRotatePdfStatus(message: string, type: StatusType) {
+    setRotatePdfStatusType(type);
+    setRotatePdfStatus(message);
   }
 
   function resetTemplateState(nextKey: TemplateKey | "") {
@@ -1096,6 +1110,123 @@ export default function Home() {
     downloadBlob(new Blob([compressPdfResultBuffer], { type: PDF_MIME }), compressPdfResultName);
   }
 
+  async function handleUploadRotatePdf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      applyRotatePdfStatus("Please upload a valid PDF file.", "error");
+      return;
+    }
+
+    setIsRotatePdfBusy(true);
+    setRotatePdfResultBuffer(null);
+    setRotatePdfResultName("");
+    applyRotatePdfStatus("Reading PDF...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const previews = await renderPdfPagePreviews(buffer);
+      setRotatePdfName(file.name);
+      setRotatePdfBuffer(buffer);
+      setRotatePdfPreviews(previews);
+      applyRotatePdfStatus(`${file.name} • ${previews.length} page(s). Use ↻ / ↺ on each page to rotate.`, "success");
+    } catch (error) {
+      setRotatePdfName("");
+      setRotatePdfBuffer(null);
+      setRotatePdfPreviews([]);
+      applyRotatePdfStatus(error instanceof Error ? error.message : "Could not read this PDF.", "error");
+    } finally {
+      setIsRotatePdfBusy(false);
+    }
+  }
+
+  function clearRotatePdf() {
+    setRotatePdfName("");
+    setRotatePdfBuffer(null);
+    setRotatePdfPreviews([]);
+    setRotatePdfResultBuffer(null);
+    setRotatePdfResultName("");
+    applyRotatePdfStatus("Cleared.", "success");
+  }
+
+  async function handleRotatePage(pageNumber: number, direction: "cw" | "ccw") {
+    if (!rotatePdfBuffer) return;
+
+    setIsRotatePdfBusy(true);
+    applyRotatePdfStatus("Rotating...", "");
+
+    try {
+      const { PDFDocument, degrees } = await import("pdf-lib");
+      const pdfDoc = await PDFDocument.load(rotatePdfBuffer);
+      const page = pdfDoc.getPage(pageNumber - 1);
+      const current = page.getRotation().angle;
+      const delta = direction === "cw" ? 90 : 270;
+      page.setRotation(degrees((current + delta) % 360));
+
+      const bytes = await pdfDoc.save();
+      const resultBuffer = bytes.buffer as ArrayBuffer;
+      const baseName = rotatePdfName.replace(/\.pdf$/i, "") || "document";
+      const outputName = `${baseName}-rotated.pdf`;
+
+      const updatedPreviews = await renderPdfPagePreviews(resultBuffer);
+      setRotatePdfBuffer(resultBuffer);
+      setRotatePdfPreviews(updatedPreviews);
+      setRotatePdfResultBuffer(resultBuffer);
+      setRotatePdfResultName(outputName);
+      applyRotatePdfStatus(
+        `Page ${pageNumber} rotated ${direction === "cw" ? "clockwise" : "counter-clockwise"}. Click Download PDF to save.`,
+        "success",
+      );
+    } catch (error) {
+      applyRotatePdfStatus(error instanceof Error ? error.message : "Rotation failed.", "error");
+    } finally {
+      setIsRotatePdfBusy(false);
+    }
+  }
+
+  function handleDownloadRotatedPdf() {
+    if (!rotatePdfResultBuffer || !rotatePdfResultName) return;
+    downloadBlob(new Blob([rotatePdfResultBuffer], { type: PDF_MIME }), rotatePdfResultName);
+  }
+
+  async function handleRotateAllPages(direction: "cw" | "ccw") {
+    if (!rotatePdfBuffer) return;
+
+    setIsRotatePdfBusy(true);
+    applyRotatePdfStatus("Rotating all pages...", "");
+
+    try {
+      const { PDFDocument, degrees } = await import("pdf-lib");
+      const pdfDoc = await PDFDocument.load(rotatePdfBuffer);
+      const pages = pdfDoc.getPages();
+      const delta = direction === "cw" ? 90 : 270;
+      for (const page of pages) {
+        page.setRotation(degrees((page.getRotation().angle + delta) % 360));
+      }
+
+      const bytes = await pdfDoc.save();
+      const resultBuffer = bytes.buffer as ArrayBuffer;
+      const baseName = rotatePdfName.replace(/\.pdf$/i, "") || "document";
+      const outputName = `${baseName}-rotated.pdf`;
+      const updatedPreviews = await renderPdfPagePreviews(resultBuffer);
+      setRotatePdfBuffer(resultBuffer);
+      setRotatePdfPreviews(updatedPreviews);
+      setRotatePdfResultBuffer(resultBuffer);
+      setRotatePdfResultName(outputName);
+      applyRotatePdfStatus(
+        `All ${pages.length} page(s) rotated ${direction === "cw" ? "clockwise" : "counter-clockwise"}. Click Download PDF to save.`,
+        "success",
+      );
+    } catch (error) {
+      applyRotatePdfStatus(error instanceof Error ? error.message : "Rotation failed.", "error");
+    } finally {
+      setIsRotatePdfBusy(false);
+    }
+  }
+
   const selectedTemplateLabel = selectedKey ? templateOptions[selectedKey].label : "";
 
   return (
@@ -1238,6 +1369,19 @@ export default function Home() {
           onCompressPdfQualityChange={setCompressPdfQuality}
           onCompressPdf={handleCompressPdf}
           onDownloadCompressedPdf={handleDownloadCompressedPdf}
+          rotatePdfName={rotatePdfName}
+          rotatePdfBuffer={rotatePdfBuffer}
+          rotatePdfPreviews={rotatePdfPreviews}
+          rotatePdfResultBuffer={rotatePdfResultBuffer}
+          rotatePdfResultName={rotatePdfResultName}
+          rotatePdfStatus={rotatePdfStatus}
+          rotatePdfStatusType={rotatePdfStatusType}
+          isRotatePdfBusy={isRotatePdfBusy}
+          onUploadRotatePdf={handleUploadRotatePdf}
+          onClearRotatePdf={clearRotatePdf}
+          onRotatePage={handleRotatePage}
+          onRotateAllPages={handleRotateAllPages}
+          onDownloadRotatedPdf={handleDownloadRotatedPdf}
         />
       </section>
 
