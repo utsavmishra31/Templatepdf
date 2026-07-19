@@ -707,52 +707,16 @@ export function PdfToolsPanel({
         </div>
 
         {compressPdfBuffer && (
-          <>
-            <div className="mt-5">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Compression Level</p>
-              <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
-                {([
-                  { value: "extreme",     label: "Extreme Compression",     note: "Less quality, high compression" },
-                  { value: "recommended", label: "Recommended Compression", note: "Good quality, good compression" },
-                  { value: "less",        label: "Less Compression",        note: "High quality, less compression" },
-                ] as const).map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
-                      compressPdfQuality === opt.value
-                        ? "border-teal-700 bg-teal-50 shadow-[0_0_0_2px_rgba(15,118,110,0.12)]"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="compressQuality"
-                      value={opt.value}
-                      checked={compressPdfQuality === opt.value}
-                      onChange={() => onCompressPdfQualityChange(opt.value)}
-                      disabled={isCompressPdfBusy || isBusy}
-                      className="mt-0.5 accent-teal-700"
-                    />
-                    <span>
-                      <span className="block text-sm font-bold text-slate-800">{opt.label}</span>
-                      <span className="block text-xs text-slate-500">{opt.note}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800 disabled:opacity-50"
-                onClick={onCompressPdf}
-                disabled={isCompressPdfBusy || isBusy}
-              >
-                Compress PDF
-              </button>
-            </div>
-          </>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800 disabled:opacity-50"
+              onClick={onCompressPdf}
+              disabled={isCompressPdfBusy || isBusy}
+            >
+              Compress PDF
+            </button>
+          </div>
         )}
 
         <p
