@@ -133,6 +133,30 @@ export function usePdfDeleteTool() {
     );
   }
 
+  async function loadFromBuffer(buffer: ArrayBuffer, name: string) {
+    setIsPdfBusy(true);
+    applyPdfStatus("Loading PDF…", "");
+    try {
+      const previews = await renderPdfPagePreviews(buffer);
+      if (!previews.length) throw new Error("The PDF has no pages.");
+      setUploadedPdfName(name);
+      setUploadedPdfBuffer(buffer);
+      setUploadedPdfPreviews(previews);
+      setSelectedPdfPages([]);
+      applyPdfStatus(
+        `Loaded ${previews.length} page(s). Select pages you want to delete.`,
+        "success",
+      );
+    } catch (error) {
+      applyPdfStatus(
+        error instanceof Error ? error.message : "Could not load PDF.",
+        "error",
+      );
+    } finally {
+      setIsPdfBusy(false);
+    }
+  }
+
   return {
     uploadedPdfName,
     uploadedPdfBuffer,
@@ -146,5 +170,6 @@ export function usePdfDeleteTool() {
     togglePdfPageSelection,
     handleDeleteSelectedPdfPages,
     handleDownloadPdf,
+    loadFromBuffer,
   };
 }

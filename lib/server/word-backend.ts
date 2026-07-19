@@ -158,7 +158,35 @@ export async function convertPdfToDocx(sourceBuffer: ArrayBuffer | Uint8Array): 
     );
 
     const outputPath = join(outputDir, "input.docx");
-    return readFile(outputPath);
+    const docxBytes = await readFile(outputPath);
+
+    // Post-process: LibreOffice places text frames at their absolute PDF
+    // coordinates (e.g. 720 twips from the page edge), but the generated DOCX
+    // also carries default page margins (~1440 twips).  When Word renders the
+    // file those margins stack, shifting every frame right by one margin width.
+    // Zeroing the page margins makes the absolute frame coordinates line up
+    // correctly with the page edge so content matches the original layout.
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = await JSZip.loadAsync(docxBytes);
+      const docEntry = zip.file("word/document.xml");
+      if (docEntry) {
+        const xml = await docEntry.async("string");
+        const fixed = xml.replace(
+          /<w:pgMar\b[^>]*\/?>/g,
+          '<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/>',
+        );
+        zip.file("word/document.xml", fixed);
+        return (await zip.generateAsync({
+          type: "nodebuffer",
+          compression: "DEFLATE",
+        })) as unknown as Buffer;
+      }
+    } catch {
+      // If post-processing fails, return the original conversion output.
+    }
+
+    return docxBytes;
   });
 }
 
