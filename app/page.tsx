@@ -141,6 +141,15 @@ export default function Home() {
   const [wordStatusType, setWordStatusType] = useState<StatusType>("");
   const [isWordBusy, setIsWordBusy] = useState(false);
 
+  const [wordToPdfName, setWordToPdfName] = useState("");
+  const [wordToPdfBuffer, setWordToPdfBuffer] = useState<ArrayBuffer | null>(null);
+  const [wordToPdfStatus, setWordToPdfStatus] = useState("");
+  const [wordToPdfStatusType, setWordToPdfStatusType] = useState<StatusType>("");
+  const [isWordToPdfBusy, setIsWordToPdfBusy] = useState(false);
+  const [wordToPdfResultBuffer, setWordToPdfResultBuffer] = useState<ArrayBuffer | null>(null);
+  const [wordToPdfPreviews, setWordToPdfPreviews] = useState<string[]>([]);
+  const [wordToPdfResultName, setWordToPdfResultName] = useState("");
+
   const displayedPlaceholders = useMemo(
     () => getDisplayPlaceholders(selectedKey, placeholders),
     [selectedKey, placeholders],
@@ -159,6 +168,11 @@ export default function Home() {
   function applyWordStatus(message: string, type: StatusType) {
     setWordStatusType(type);
     setWordStatus(message);
+  }
+
+  function applyWordToPdfStatus(message: string, type: StatusType) {
+    setWordToPdfStatusType(type);
+    setWordToPdfStatus(message);
   }
 
   function resetTemplateState(nextKey: TemplateKey | "") {
@@ -517,13 +531,12 @@ export default function Home() {
 
       const baseName = uploadedPdfName.replace(/\.pdf$/i, "") || "edited";
       const outputName = `${baseName}-updated.pdf`;
-      downloadBlob(new Blob([result.nextBuffer], { type: PDF_MIME }), outputName);
 
       setUploadedPdfName(outputName);
       setUploadedPdfBuffer(result.nextBuffer);
       setUploadedPdfPreviews(nextPreviews);
       setSelectedPdfPages([]);
-      applyPdfStatus(`Deleted ${result.removedCount} page(s). Downloaded ${outputName}.`, "success");
+      applyPdfStatus(`Deleted ${result.removedCount} page(s). Review the pages below, then click Download PDF.`, "success");
     } catch (error) {
       applyPdfStatus(error instanceof Error ? error.message : "Page deletion failed.", "error");
     } finally {
@@ -656,8 +669,6 @@ export default function Home() {
         ? nextDeletedOriginalPages.length - deletedWordOriginalPages.length
         : selectedWordPages.length;
 
-      downloadBlob(new Blob([result.nextBuffer], { type: DOCX_MIME }), outputName);
-
       setUploadedWordName(outputName);
       setUploadedWordBuffer(result.nextBuffer);
       setUploadedWordOriginalBuffer((canUseOriginalMapping && !hasMappingDrift) ? uploadedWordOriginalBuffer : result.nextBuffer);
@@ -669,8 +680,8 @@ export default function Home() {
       const rebased = !canUseOriginalMapping || hasMappingDrift;
       applyWordStatus(
         rebased
-          ? `Deleted ${newlyDeletedCount} page(s). Downloaded ${outputName}. Page mapping was auto-reset for continued edits.`
-          : `Deleted ${newlyDeletedCount} page(s). Downloaded ${outputName}.`,
+          ? `Deleted ${newlyDeletedCount} page(s). Review below, then click Download DOCX. Page mapping was auto-reset for continued edits.`
+          : `Deleted ${newlyDeletedCount} page(s). Review the pages below, then click Download DOCX.`,
         "success",
       );
     } catch (error) {
@@ -678,6 +689,76 @@ export default function Home() {
     } finally {
       setIsWordBusy(false);
     }
+  }
+
+  async function handleUploadWordToPdf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    const isDocx = file.type === DOCX_MIME || file.name.toLowerCase().endsWith(".docx");
+    if (!isDocx) {
+      applyWordToPdfStatus("Please upload a valid DOCX file.", "error");
+      return;
+    }
+
+    const buffer = await file.arrayBuffer();
+    setWordToPdfName(file.name);
+    setWordToPdfBuffer(buffer);
+    applyWordToPdfStatus(`${file.name} ready. Click Convert to download the PDF.`, "success");
+  }
+
+  function clearWordToPdf() {
+    setWordToPdfName("");
+    setWordToPdfBuffer(null);
+    setWordToPdfResultBuffer(null);
+    setWordToPdfPreviews([]);
+    setWordToPdfResultName("");
+    applyWordToPdfStatus("Cleared.", "success");
+  }
+
+  async function handleConvertWordToPdf() {
+    if (!wordToPdfBuffer || !wordToPdfName) {
+      applyWordToPdfStatus("Upload a Word file first.", "error");
+      return;
+    }
+
+    setIsWordToPdfBusy(true);
+    setWordToPdfResultBuffer(null);
+    setWordToPdfPreviews([]);
+    setWordToPdfResultName("");
+    applyWordToPdfStatus("Converting to PDF via LibreOffice...", "");
+
+    try {
+      const pdfBuffer = await requestWordPreviewPdf(wordToPdfName, wordToPdfBuffer);
+      const baseName = wordToPdfName.replace(/\.docx$/i, "") || "document";
+      const outputName = `${baseName}.pdf`;
+      const previews = await renderPdfPagePreviews(pdfBuffer);
+      setWordToPdfResultBuffer(pdfBuffer);
+      setWordToPdfPreviews(previews);
+      setWordToPdfResultName(outputName);
+      applyWordToPdfStatus(`Converted — ${previews.length} page(s). Review below, then click Download PDF.`, "success");
+    } catch (error) {
+      applyWordToPdfStatus(error instanceof Error ? error.message : "Conversion failed.", "error");
+    } finally {
+      setIsWordToPdfBusy(false);
+    }
+  }
+
+  function handleDownloadPdf() {
+    if (!uploadedPdfBuffer || !uploadedPdfName) return;
+    downloadBlob(new Blob([uploadedPdfBuffer], { type: PDF_MIME }), uploadedPdfName);
+  }
+
+  function handleDownloadWord() {
+    if (!uploadedWordBuffer || !uploadedWordName) return;
+    downloadBlob(new Blob([uploadedWordBuffer], { type: DOCX_MIME }), uploadedWordName);
+  }
+
+  function handleDownloadWordToPdf() {
+    if (!wordToPdfResultBuffer || !wordToPdfResultName) return;
+    downloadBlob(new Blob([wordToPdfResultBuffer], { type: PDF_MIME }), wordToPdfResultName);
   }
 
   const selectedTemplateLabel = selectedKey ? templateOptions[selectedKey].label : "";
@@ -769,6 +850,20 @@ export default function Home() {
           onClearWord={clearUploadedWord}
           onDeleteSelectedWordPages={handleDeleteSelectedWordPages}
           onToggleWordPageSelection={toggleWordPageSelection}
+          wordToPdfName={wordToPdfName}
+          wordToPdfBuffer={wordToPdfBuffer}
+          wordToPdfStatus={wordToPdfStatus}
+          wordToPdfStatusType={wordToPdfStatusType}
+          isWordToPdfBusy={isWordToPdfBusy}
+          onUploadWordToPdf={handleUploadWordToPdf}
+          onClearWordToPdf={clearWordToPdf}
+          onConvertWordToPdf={handleConvertWordToPdf}
+          wordToPdfPreviews={wordToPdfPreviews}
+          wordToPdfResultName={wordToPdfResultName}
+          wordToPdfResultBuffer={wordToPdfResultBuffer}
+          onDownloadPdf={handleDownloadPdf}
+          onDownloadWord={handleDownloadWord}
+          onDownloadWordToPdf={handleDownloadWordToPdf}
         />
       </section>
 
