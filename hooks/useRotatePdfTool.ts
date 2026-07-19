@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { renderPdfPagePreviews, renderSinglePdfPage } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -97,9 +97,14 @@ export function useRotatePdfTool() {
       const baseName = rotatePdfName.replace(/\.pdf$/i, "") || "document";
       const outputName = `${baseName}-rotated.pdf`;
 
-      const updatedPreviews = await renderPdfPagePreviews(resultBuffer);
+      // Only re-render the single rotated page — keep all other previews unchanged
+      const updatedPreview = await renderSinglePdfPage(resultBuffer, pageNumber);
       setRotatePdfBuffer(resultBuffer);
-      setRotatePdfPreviews(updatedPreviews);
+      setRotatePdfPreviews((prev) => {
+        const next = [...prev];
+        next[pageNumber - 1] = updatedPreview;
+        return next;
+      });
       setRotatePdfResultBuffer(resultBuffer);
       setRotatePdfResultName(outputName);
       applyRotatePdfStatus(

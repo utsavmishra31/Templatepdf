@@ -1,222 +1,222 @@
-"use client";
+import Link from "next/link";
 
-import { DocumentPreview } from "@/components/editor/DocumentPreview";
-import { EntryTabs } from "@/components/editor/EntryTabs";
-import { PdfToolsPanel } from "@/components/editor/PdfToolsPanel";
-import { TemplateSelector } from "@/components/editor/TemplateSelector";
-import { useTemplateEditor } from "@/hooks/useTemplateEditor";
-import { usePdfDeleteTool } from "@/hooks/usePdfDeleteTool";
-import { useWordDeleteTool } from "@/hooks/useWordDeleteTool";
-import { useWordToPdfTool } from "@/hooks/useWordToPdfTool";
-import { usePdfToWordTool } from "@/hooks/usePdfToWordTool";
-import { useMergePdfTool } from "@/hooks/useMergePdfTool";
-import { useCompressPdfTool } from "@/hooks/useCompressPdfTool";
-import { useRotatePdfTool } from "@/hooks/useRotatePdfTool";
-import { useSplitPdfTool } from "@/hooks/useSplitPdfTool";
-import { templateOptions } from "@/lib/template";
+const tools = [
+  {
+    href: "/tools/template-editor",
+    title: "Template Editor",
+    description: "Fill in placeholders and download your document as Word or PDF.",
+    badge: "Word & PDF",
+    badgeColor: "bg-teal-50 text-teal-700 border-teal-100",
+    iconBg: "bg-teal-50",
+    iconColor: "text-teal-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/pdf-delete",
+    title: "Delete PDF Pages",
+    description: "Upload a PDF, select pages to remove, and download the result.",
+    badge: "PDF",
+    badgeColor: "bg-teal-50 text-teal-700 border-teal-100",
+    iconBg: "bg-teal-50",
+    iconColor: "text-teal-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/>
+        <path d="M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/word-delete",
+    title: "Delete Word Pages",
+    description: "Upload a DOCX, preview exact pages, select and delete them.",
+    badge: "Word",
+    badgeColor: "bg-amber-50 text-amber-700 border-amber-100",
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/word-to-pdf",
+    title: "Word to PDF",
+    description: "Convert a DOCX file to a high-fidelity PDF using LibreOffice.",
+    badge: "Word → PDF",
+    badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
+    iconBg: "bg-indigo-50",
+    iconColor: "text-indigo-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12h14"/>
+        <path d="M12 5l7 7-7 7"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/pdf-to-word",
+    title: "PDF to Word",
+    description: "Convert a PDF document into an editable DOCX file.",
+    badge: "PDF → Word",
+    badgeColor: "bg-rose-50 text-rose-700 border-rose-100",
+    iconBg: "bg-rose-50",
+    iconColor: "text-rose-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 12H5"/>
+        <path d="M12 19l-7-7 7-7"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/merge-pdf",
+    title: "Merge PDFs",
+    description: "Combine multiple PDF files into one. Drag to reorder before merging.",
+    badge: "Merge",
+    badgeColor: "bg-violet-50 text-violet-700 border-violet-100",
+    iconBg: "bg-violet-50",
+    iconColor: "text-violet-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 6H3v12h5"/>
+        <path d="M16 6h5v12h-5"/>
+        <path d="M12 3v18"/>
+        <path d="M8 12H3"/>
+        <path d="M16 12h5"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/compress-pdf",
+    title: "Compress PDF",
+    description: "Reduce PDF file size with Extreme, Recommended, or Less compression.",
+    badge: "Compress",
+    badgeColor: "bg-orange-50 text-orange-700 border-orange-100",
+    iconBg: "bg-orange-50",
+    iconColor: "text-orange-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="4 14 10 14 10 20"/>
+        <polyline points="20 10 14 10 14 4"/>
+        <line x1="10" y1="14" x2="3" y2="21"/>
+        <line x1="21" y1="3" x2="14" y2="10"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/rotate-pdf",
+    title: "Rotate PDF",
+    description: "Rotate individual pages or all pages clockwise / counter-clockwise.",
+    badge: "Rotate",
+    badgeColor: "bg-sky-50 text-sky-700 border-sky-100",
+    iconBg: "bg-sky-50",
+    iconColor: "text-sky-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 2v6h-6"/>
+        <path d="M21 13a9 9 0 1 1-3-7.7L21 8"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/tools/split-pdf",
+    title: "Split PDF",
+    description: "Split one PDF into multiple files by defining custom page ranges.",
+    badge: "Split",
+    badgeColor: "bg-lime-50 text-lime-700 border-lime-100",
+    iconBg: "bg-lime-50",
+    iconColor: "text-lime-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 3h5v5"/>
+        <path d="M8 3H3v5"/>
+        <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/>
+        <path d="M21 3l-7.828 7.828"/>
+      </svg>
+    ),
+  },
+];
 
-export default function Home() {
-  const editor = useTemplateEditor();
-  const pdfDelete = usePdfDeleteTool();
-  const wordDelete = useWordDeleteTool();
-  const wordToPdf = useWordToPdfTool();
-  const pdfToWord = usePdfToWordTool();
-  const mergePdf = useMergePdfTool();
-  const compressPdf = useCompressPdfTool();
-  const rotatePdf = useRotatePdfTool();
-  const splitPdf = useSplitPdfTool();
-
-  const selectedTemplateLabel = editor.selectedKey
-    ? templateOptions[editor.selectedKey].label
-    : "";
-
+export default function DashboardPage() {
   return (
-    <main className="mx-auto w-[min(1180px,calc(100%-32px))] py-9 max-md:w-[min(100%-22px,1180px)] max-md:pt-5">
-      <section
-        className="rounded-lg border border-slate-200 bg-white/95 p-7 shadow-[0_20px_60px_rgba(32,36,31,0.12)] max-md:p-5"
-        aria-labelledby="appTitle"
-      >
-        <TemplateSelector
-          selectedKey={editor.selectedKey}
-          displayedPlaceholders={editor.displayedPlaceholders}
-          selectedTemplateLabel={selectedTemplateLabel}
-          isBusy={editor.isBusy}
-          onTemplateChange={editor.handleTemplateChange}
-        />
+    <div className="min-h-screen bg-slate-50">
+      {/* Hero */}
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))] py-12 max-md:py-8">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-teal-700">
+            PDF &amp; Doc Tools
+          </p>
+          <h1 className="font-[var(--font-newsreader)] text-4xl font-semibold text-slate-900 max-md:text-3xl">
+            What would you like to do?
+          </h1>
+          <p className="mt-2 max-w-xl text-slate-500">
+            All tools run locally in your browser or via a secure server-side process. No files are stored.
+          </p>
+        </div>
+      </div>
 
-        <EntryTabs
-          displayedPlaceholders={editor.displayedPlaceholders}
-          activeTab={editor.activeTab}
-          onTabChange={editor.setActiveTab}
-          bulkInput={editor.bulkInput}
-          onBulkInputChange={editor.setBulkInput}
-          onApplyBulk={editor.applyBulkInput}
-          onClearBulk={editor.clearBulkInput}
-          bulkResult={editor.bulkResult}
-          bulkResultType={editor.bulkResultType}
-          formValues={editor.formValues}
-          onFieldChange={editor.handleFieldValueChange}
-          isBusy={editor.isBusy}
-        />
-
-        {editor.displayedPlaceholders.length > 0 && (
-          <div className="mt-5 flex flex-wrap items-center gap-3" id="actions">
-            <button
-              type="button"
-              className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800"
-              onClick={editor.handleDocxDownload}
-              disabled={editor.isBusy}
+      {/* Tool grid */}
+      <div className="mx-auto w-[min(1180px,calc(100%-32px))] py-10">
+        <div className="grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-sm:grid-cols-1">
+          {tools.map((tool) => (
+            <Link
+              key={tool.href}
+              href={tool.href}
+              className="group relative flex flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
             >
-              Download MS Word
-            </button>
-            <button
-              type="button"
-              className="min-h-11 rounded-lg border border-teal-700 bg-white px-4 font-extrabold text-teal-800"
-              onClick={editor.handlePdfDownload}
-              disabled={editor.isBusy}
-            >
-              Download PDF
-            </button>
-            <button
-              type="button"
-              className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-4 font-extrabold text-slate-600"
-              onClick={editor.clearFields}
-              disabled={editor.isBusy}
-            >
-              Clear Fields
-            </button>
-          </div>
-        )}
+              {/* Icon */}
+              <div className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl ${tool.iconBg} ${tool.iconColor}`}>
+                {tool.icon}
+              </div>
 
-        <p
-          className={`mt-4 min-h-6 font-bold ${
-            editor.statusType === "error"
-              ? "text-red-700"
-              : editor.statusType === "success"
-                ? "text-teal-800"
-                : "text-slate-500"
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          {editor.status}
-        </p>
+              {/* Text */}
+              <h2 className="text-base font-extrabold text-slate-900">
+                {tool.title}
+              </h2>
+              <p className="mt-1 flex-1 text-sm text-slate-500 leading-relaxed">
+                {tool.description}
+              </p>
 
-        <PdfToolsPanel
-          uploadedPdfName={pdfDelete.uploadedPdfName}
-          uploadedPdfBuffer={pdfDelete.uploadedPdfBuffer}
-          uploadedPdfPreviews={pdfDelete.uploadedPdfPreviews}
-          selectedPdfPages={pdfDelete.selectedPdfPages}
-          pdfStatus={pdfDelete.pdfStatus}
-          pdfStatusType={pdfDelete.pdfStatusType}
-          isPdfBusy={pdfDelete.isPdfBusy}
-          uploadedWordName={wordDelete.uploadedWordName}
-          uploadedWordBuffer={wordDelete.uploadedWordBuffer}
-          uploadedWordPreviews={wordDelete.uploadedWordPreviews}
-          selectedWordPages={wordDelete.selectedWordPages}
-          wordStatus={wordDelete.wordStatus}
-          wordStatusType={wordDelete.wordStatusType}
-          isWordBusy={wordDelete.isWordBusy}
-          isBusy={editor.isBusy}
-          onUploadPdf={pdfDelete.handleUploadPdf}
-          onClearPdf={pdfDelete.clearUploadedPdf}
-          onDeleteSelectedPages={pdfDelete.handleDeleteSelectedPdfPages}
-          onTogglePageSelection={pdfDelete.togglePdfPageSelection}
-          onUploadWord={wordDelete.handleUploadWord}
-          onClearWord={wordDelete.clearUploadedWord}
-          onDeleteSelectedWordPages={wordDelete.handleDeleteSelectedWordPages}
-          onToggleWordPageSelection={wordDelete.toggleWordPageSelection}
-          wordToPdfName={wordToPdf.wordToPdfName}
-          wordToPdfBuffer={wordToPdf.wordToPdfBuffer}
-          wordToPdfStatus={wordToPdf.wordToPdfStatus}
-          wordToPdfStatusType={wordToPdf.wordToPdfStatusType}
-          isWordToPdfBusy={wordToPdf.isWordToPdfBusy}
-          onUploadWordToPdf={wordToPdf.handleUploadWordToPdf}
-          onClearWordToPdf={wordToPdf.clearWordToPdf}
-          onConvertWordToPdf={wordToPdf.handleConvertWordToPdf}
-          wordToPdfPreviews={wordToPdf.wordToPdfPreviews}
-          wordToPdfResultName={wordToPdf.wordToPdfResultName}
-          wordToPdfResultBuffer={wordToPdf.wordToPdfResultBuffer}
-          onDownloadPdf={pdfDelete.handleDownloadPdf}
-          onDownloadWord={wordDelete.handleDownloadWord}
-          onDownloadWordToPdf={wordToPdf.handleDownloadWordToPdf}
-          pdfToWordName={pdfToWord.pdfToWordName}
-          pdfToWordBuffer={pdfToWord.pdfToWordBuffer}
-          pdfToWordPreviews={pdfToWord.pdfToWordPreviews}
-          pdfToWordResultBuffer={pdfToWord.pdfToWordResultBuffer}
-          pdfToWordResultName={pdfToWord.pdfToWordResultName}
-          pdfToWordStatus={pdfToWord.pdfToWordStatus}
-          pdfToWordStatusType={pdfToWord.pdfToWordStatusType}
-          isPdfToWordBusy={pdfToWord.isPdfToWordBusy}
-          onUploadPdfToWord={pdfToWord.handleUploadPdfToWord}
-          onClearPdfToWord={pdfToWord.clearPdfToWord}
-          onConvertPdfToWord={pdfToWord.handleConvertPdfToWord}
-          onDownloadPdfToWord={pdfToWord.handleDownloadPdfToWord}
-          mergePdfFiles={mergePdf.mergePdfFiles.map((f) => ({
-            name: f.name,
-            firstPageSrc: f.firstPageSrc,
-            pageCount: f.pageCount,
-          }))}
-          mergePdfResultBuffer={mergePdf.mergePdfResultBuffer}
-          mergePdfResultName={mergePdf.mergePdfResultName}
-          mergePdfStatus={mergePdf.mergePdfStatus}
-          mergePdfStatusType={mergePdf.mergePdfStatusType}
-          isMergePdfBusy={mergePdf.isMergePdfBusy}
-          onAddMergePdfFiles={mergePdf.handleAddMergePdfFiles}
-          onRemoveMergePdfFile={mergePdf.handleRemoveMergePdfFile}
-          onMoveMergePdfFile={mergePdf.handleMoveMergePdfFile}
-          onMergePdfs={mergePdf.handleMergePdfs}
-          onClearMergePdf={mergePdf.clearMergePdf}
-          onDownloadMergedPdf={mergePdf.handleDownloadMergedPdf}
-          compressPdfName={compressPdf.compressPdfName}
-          compressPdfBuffer={compressPdf.compressPdfBuffer}
-          compressPdfOriginalSize={compressPdf.compressPdfOriginalSize}
-          compressPdfQuality={compressPdf.compressPdfQuality}
-          compressPdfResultBuffer={compressPdf.compressPdfResultBuffer}
-          compressPdfResultName={compressPdf.compressPdfResultName}
-          compressPdfResultSize={compressPdf.compressPdfResultSize}
-          compressPdfStatus={compressPdf.compressPdfStatus}
-          compressPdfStatusType={compressPdf.compressPdfStatusType}
-          isCompressPdfBusy={compressPdf.isCompressPdfBusy}
-          onUploadCompressPdf={compressPdf.handleUploadCompressPdf}
-          onClearCompressPdf={compressPdf.clearCompressPdf}
-          onCompressPdfQualityChange={compressPdf.setCompressPdfQuality}
-          onCompressPdf={compressPdf.handleCompressPdf}
-          onDownloadCompressedPdf={compressPdf.handleDownloadCompressedPdf}
-          rotatePdfName={rotatePdf.rotatePdfName}
-          rotatePdfBuffer={rotatePdf.rotatePdfBuffer}
-          rotatePdfPreviews={rotatePdf.rotatePdfPreviews}
-          rotatePdfResultBuffer={rotatePdf.rotatePdfResultBuffer}
-          rotatePdfResultName={rotatePdf.rotatePdfResultName}
-          rotatePdfStatus={rotatePdf.rotatePdfStatus}
-          rotatePdfStatusType={rotatePdf.rotatePdfStatusType}
-          isRotatePdfBusy={rotatePdf.isRotatePdfBusy}
-          onUploadRotatePdf={rotatePdf.handleUploadRotatePdf}
-          onClearRotatePdf={rotatePdf.clearRotatePdf}
-          onRotatePage={rotatePdf.handleRotatePage}
-          onRotateAllPages={rotatePdf.handleRotateAllPages}
-          onDownloadRotatedPdf={rotatePdf.handleDownloadRotatedPdf}
-          splitPdfName={splitPdf.splitPdfName}
-          splitPdfBuffer={splitPdf.splitPdfBuffer}
-          splitPdfPreviews={splitPdf.splitPdfPreviews}
-          splitNumOutputs={splitPdf.splitNumOutputs}
-          splitRanges={splitPdf.splitRanges}
-          splitPdfStatus={splitPdf.splitPdfStatus}
-          splitPdfStatusType={splitPdf.splitPdfStatusType}
-          isSplitPdfBusy={splitPdf.isSplitPdfBusy}
-          onUploadSplitPdf={splitPdf.handleUploadSplitPdf}
-          onClearSplitPdf={splitPdf.clearSplitPdf}
-          onSplitNumOutputsChange={splitPdf.handleSplitNumOutputsChange}
-          onSplitRangeChange={splitPdf.handleSplitRangeChange}
-          onGenerateSplit={splitPdf.handleGenerateSplit}
-        />
-      </section>
-
-      <DocumentPreview
-        previewVisible={editor.previewVisible}
-        previewBadge={editor.previewBadge}
-        previewHtml={editor.previewHtml}
-      />
-    </main>
+              {/* Footer */}
+              <div className="mt-4 flex items-center justify-between">
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold ${tool.badgeColor}`}>
+                  {tool.badge}
+                </span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500"
+                >
+                  <path d="M5 12h14"/>
+                  <path d="M12 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

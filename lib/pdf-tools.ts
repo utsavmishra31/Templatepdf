@@ -19,6 +19,28 @@ type PdfJsModule = {
   getDocument: (source: { data: ArrayBuffer }) => { promise: Promise<PdfJsDocumentProxy> };
 };
 
+async function renderOnePage(pdf: PdfJsDocumentProxy, pageNumber: number): Promise<string> {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 0.75 });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvasContext: context, viewport }).promise;
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
+export async function renderSinglePdfPage(
+  sourceBuffer: ArrayBuffer,
+  pageNumber: number,
+): Promise<string> {
+  const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+  const pdf = await pdfjs.getDocument({ data: sourceBuffer.slice(0) }).promise;
+  return renderOnePage(pdf, pageNumber);
+}
+
 export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer): Promise<string[]> {
   const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
   pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
@@ -28,19 +50,7 @@ export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer): Promise<
   const previews: string[] = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 0.75 });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      throw new Error("Canvas rendering is unavailable in this browser.");
-    }
-
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvasContext: context, viewport }).promise;
-    previews.push(canvas.toDataURL("image/jpeg", 0.92));
+    previews.push(await renderOnePage(pdf, pageNumber));
   }
 
   return previews;
