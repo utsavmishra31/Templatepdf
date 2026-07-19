@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const tools = [
   {
-    href: "/tools/template-editor",
+    href: "/template-editor",
     title: "Template Editor",
     description: "Fill in placeholders and download your document as Word or PDF.",
     badge: "Word & PDF",
@@ -20,7 +20,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/pdf-delete",
+    href: "/pdf-delete",
     title: "Delete PDF Pages",
     description: "Upload a PDF, select pages to remove, and download the result.",
     badge: "PDF",
@@ -38,7 +38,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/word-delete",
+    href: "/word-delete",
     title: "Delete Word Pages",
     description: "Upload a DOCX, preview exact pages, select and delete them.",
     badge: "Word",
@@ -54,7 +54,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/word-to-pdf",
+    href: "/word-to-pdf",
     title: "Word to PDF",
     description: "Convert a DOCX file to a high-fidelity PDF using LibreOffice.",
     badge: "Word → PDF",
@@ -69,7 +69,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/pdf-to-word",
+    href: "/pdf-to-word",
     title: "PDF to Word",
     description: "Convert a PDF document into an editable DOCX file.",
     badge: "PDF → Word",
@@ -84,7 +84,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/merge-pdf",
+    href: "/merge-pdf",
     title: "Merge PDFs",
     description: "Combine multiple PDF files into one. Drag to reorder before merging.",
     badge: "Merge",
@@ -102,7 +102,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/compress-pdf",
+    href: "/compress-pdf",
     title: "Compress PDF",
     description: "Reduce PDF file size with Extreme, Recommended, or Less compression.",
     badge: "Compress",
@@ -119,7 +119,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/rotate-pdf",
+    href: "/rotate-pdf",
     title: "Rotate PDF",
     description: "Rotate individual pages or all pages clockwise / counter-clockwise.",
     badge: "Rotate",
@@ -134,7 +134,7 @@ const tools = [
     ),
   },
   {
-    href: "/tools/split-pdf",
+    href: "/split-pdf",
     title: "Split PDF",
     description: "Split one PDF into multiple files by defining custom page ranges.",
     badge: "Split",
