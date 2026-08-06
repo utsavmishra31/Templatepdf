@@ -2,66 +2,8 @@ import type JSZip from "jszip";
 
 const textNodePattern = /(<w:t\b[^>]*>)([\s\S]*?)(<\/w:t>)/g;
 
-const spanishMonths = [
-  "enero",
-  "febrero",
-  "marzo",
-  "abril",
-  "mayo",
-  "junio",
-  "julio",
-  "agosto",
-  "septiembre",
-  "octubre",
-  "noviembre",
-  "diciembre",
-];
-
-const englishMonthIndex: Record<string, number> = {
-  jan: 0,
-  january: 0,
-  feb: 1,
-  february: 1,
-  mar: 2,
-  march: 2,
-  apr: 3,
-  april: 3,
-  may: 4,
-  jun: 5,
-  june: 5,
-  jul: 6,
-  july: 6,
-  aug: 7,
-  august: 7,
-  sep: 8,
-  sept: 8,
-  september: 8,
-  oct: 9,
-  october: 9,
-  nov: 10,
-  november: 10,
-  dec: 11,
-  december: 11,
-};
-
-const typeOptions = [
-  "VISADO DE TURISTA",
-  "VISADO / ESTANCIA A LARGO PLAZO",
-  "FINES DE INMIGRACIÓN DISTINTOS DE LA CIUDADANÍA",
-  "SOLICITUD DE CIUDADANÍA/NACIONALIDAD",
-  "PERMISO DE RESIDENCIA",
-  "EMPLEO / VISADO DE EMPLEO / PERMISO DE TRABAJO",
-  "EDUCACIÓN / INVESTIGACIÓN",
-  "VIAJAR al",
-];
-
-const titleOptions = ["Sr.", "Sra."];
-const relationOptions = ["hijo de", "hija de", "mujer de"];
-const registrarOptions = ["Sub Registrador", "Local Registrador", "Registrador Local (EOMC)"];
-
-export type TemplateKey = "pcc-jalandhar" | "pcc-chandigarh" | "medical" | "birth" | "marriage";
-
-export type TabType = "bulk" | "fields";
+// Matches any of: <<...>>, {{...}}, ((...)), [[[...]]]
+export const PLACEHOLDER_PATTERN = /<<[^<>]+>>|{{[^{}]+}}|\(\([^()]+\)\)|\[\[[^\[\]]+\]\]/g;
 
 export type PlaceholderEntry = {
   token: string;
@@ -69,122 +11,66 @@ export type PlaceholderEntry = {
   index: number;
 };
 
-export const templateOptions: Record<TemplateKey, { label: string; templatePath: string; outputName: string }> = {
-  "pcc-jalandhar": {
-    label: "PCC Jalandhar",
-    templatePath: "/templates/pccjalandhar.docx",
-    outputName: "pcc-jalandhar-translation",
-  },
-  "pcc-chandigarh": {
-    label: "PCC Chandigarh",
-    templatePath: "/templates/pccChandigarh.docx",
-    outputName: "pcc-chandigarh-translation",
-  },
-  medical: {
-    label: "Medical",
-    templatePath: "/templates/MEDICAL.docx",
-    outputName: "medical-translation",
-  },
-  birth: {
-    label: "Birth",
-    templatePath: "/templates/BIRTH.docx",
-    outputName: "birth-translation",
-  },
-  marriage: {
-    label: "Marriage",
-    templatePath: "/templates/MARRIAGE.docx",
-    outputName: "marriage-translation",
-  },
-};
-
 export function humanizePlaceholder(token: string): string {
-  const clean = token.replace(/[<>]/g, "").replace(/[_-]+/g, " ").trim();
+  // Strip any outer bracket pair: <<>>, {{}}, (()), [[]]
+  const clean = token
+    .replace(/^<<|>>$/g, "")
+    .replace(/^{{|}}$/g, "")
+    .replace(/^\(\(|\)\)$/g, "")
+    .replace(/^\[\[|\]\]$/g, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
   return clean
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
     .replace(/^0i\b/i, "0I");
 }
 
-export function getDropdownLookupKey(value: string): string {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-export function getDropdownOptions(token: string): string[] {
-  if (token === "<<TYPE>>") return typeOptions;
-  if (token === "<<TITLE>>") return titleOptions;
-  if (token === "<<RELATION>>") return relationOptions;
-  if (token === "<<REGISTRAR>>") return registrarOptions;
-  return [];
-}
-
-export function hasDropdownOptions(token: string): boolean {
-  return getDropdownOptions(token).length > 0;
-}
-
-export function isAutomaticDatePlaceholder(token: string): boolean {
-  return token === "<<T_DATE>>" || token === "<<TODAY_DATE>>";
-}
-
-export function getAutomaticDateReplacements(): Record<string, string> {
-  const today = new Date();
-  const day = String(today.getDate()).padStart(2, "0");
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const year = today.getFullYear();
-
-  return {
-    "<<T_DATE>>": `${day}/${month}/${year}`,
-    "<<TODAY_DATE>>": `${day} de ${spanishMonths[today.getMonth()]} de ${year}`,
-  };
-}
-
-export function normalizeDateValue(value: string): string {
-  const dateMatch = String(value || "").trim().match(/^(\d{1,2})[-\s]([A-Za-z]{3,9})[-\s](\d{4})$/);
-  if (!dateMatch) return value;
-
-  const monthIndex = englishMonthIndex[dateMatch[2].toLowerCase()];
-  if (monthIndex === undefined) return value;
-
-  const day = dateMatch[1].padStart(2, "0");
-  return `${day} de ${spanishMonths[monthIndex]} de ${dateMatch[3]}`;
-}
-
-export function parseBulkPlaceholderValues(input: string): Record<string, string> {
-  const values: Record<string, string> = {};
+/**
+ * Parse a bulk-paste string of the form:
+ *   <<PLACEHOLDER>> = value
+ *   {{PLACEHOLDER}} → value
+ *   [[PLACEHOLDER]] = value
+ *
+ * Works with ALL four bracket styles and both `=` and `→` separators.
+ * Returns a map of token → value (keys are the raw tokens as they appear
+ * in the pasted text; the caller matches them to loaded placeholders).
+ */
+export function parseBulkInput(input: string): Record<string, string> {
+  const result: Record<string, string> = {};
   const text = input || "";
-  const markerPattern = /<<[^<>]+>>\s*(?:=|\u2192)/g;
-  const markers = Array.from(text.matchAll(markerPattern));
 
-  markers.forEach((marker, index) => {
-    const placeholderMatch = marker[0].match(/<<[^<>]+>>/);
-    if (!placeholderMatch || marker.index === undefined) return;
+  // Build a pattern that captures the placeholder AND consumes the separator
+  const markerRe = new RegExp(
+    `(${PLACEHOLDER_PATTERN.source})[ \\t]*(?:=|\\u2192)[ \\t]*`,
+    "g",
+  );
 
-    const placeholder = placeholderMatch[0];
+  const markers = Array.from(text.matchAll(markerRe));
+
+  markers.forEach((marker, idx) => {
+    const token = marker[1];
+    if (!token || marker.index === undefined) return;
+
     const valueStart = marker.index + marker[0].length;
-    const valueEnd = index + 1 < markers.length && markers[index + 1].index !== undefined ? markers[index + 1].index : text.length;
-    const value = cleanBulkValue(text.slice(valueStart, valueEnd));
+    const valueEnd =
+      idx + 1 < markers.length && markers[idx + 1].index !== undefined
+        ? (markers[idx + 1].index as number)
+        : text.length;
 
-    if (value || !(placeholder in values)) {
-      values[placeholder] = value;
+    const value = text
+      .slice(valueStart, valueEnd)
+      .replace(/^[\s,;|]+/, "")   // strip leading junk
+      .replace(/[\s,;|]+$/, "")   // strip trailing junk
+      .trim();
+
+    // Keep first occurrence unless a later one has an actual value
+    if (!(token in result) || value) {
+      result[token] = value;
     }
   });
 
-  return values;
-}
-
-function cleanBulkValue(value: string): string {
-  const cleaned = value
-    .replace(/^\s*[,;|]+\s*/, "")
-    .replace(/\s*[,;|]+\s*$/, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .trim();
-
-  return normalizeDateValue(cleaned);
+  return result;
 }
 
 export async function extractPlaceholders(zip: JSZip): Promise<PlaceholderEntry[]> {
@@ -197,7 +83,7 @@ export async function extractPlaceholders(zip: JSZip): Promise<PlaceholderEntry[
 
     const xml = await file.async("string");
     const text = getJoinedTextNodes(xml);
-    const matches = text.matchAll(/<<[^<>]+>>/g);
+    const matches = text.matchAll(new RegExp(PLACEHOLDER_PATTERN.source, "g"));
 
     for (const match of matches) {
       const token = match[0];
@@ -218,23 +104,6 @@ function getJoinedTextNodes(xml: string): string {
   return Array.from(xml.matchAll(textNodePattern), (match) => decodeXml(match[2])).join("");
 }
 
-export function getDisplayPlaceholders(selectedKey: TemplateKey | "", placeholders: PlaceholderEntry[]): PlaceholderEntry[] {
-  if (!selectedKey.startsWith("pcc-")) {
-    return placeholders;
-  }
-
-  const ordered = placeholders.filter(({ token }) => token !== "<<NAME>>");
-  const namePlaceholder = placeholders.find(({ token }) => token === "<<NAME>>");
-  const titleIndex = ordered.findIndex(({ token }) => token === "<<TITLE>>");
-
-  if (!namePlaceholder || titleIndex < 0) {
-    return placeholders;
-  }
-
-  ordered.splice(titleIndex + 1, 0, namePlaceholder);
-  return ordered;
-}
-
 export function replaceXmlTokens(xmlText: string, replacements: Record<string, string>): string {
   let updated = xmlText;
   const entries = Object.entries(replacements).sort((left, right) => right[0].length - left[0].length);
@@ -244,16 +113,23 @@ export function replaceXmlTokens(xmlText: string, replacements: Record<string, s
     const escapedPlaceholder = escapeXml(placeholder);
     const variants = new Set<string>([placeholder, escapedPlaceholder]);
 
-    if (placeholder.endsWith(">>")) {
-      const malformed = placeholder.slice(0, -1);
-      variants.add(malformed);
-      variants.add(escapeXml(malformed));
-    }
-
-    if (placeholder.startsWith("<<")) {
-      const missingOpen = placeholder.slice(1);
-      variants.add(missingOpen);
-      variants.add(escapeXml(missingOpen));
+    // Add malformed / partially-entity-encoded variants for each bracket style.
+    // Word sometimes stores e.g. <<FOO>> as &lt;&lt;FOO&gt;&gt; in XML and may
+    // also produce one-bracket-short versions depending on the renderer.
+    if (placeholder.startsWith("<<") && placeholder.endsWith(">>")) {
+      const missingClose = placeholder.slice(0, -1);  // <<FOO>
+      const missingOpen  = placeholder.slice(1);      // <FOO>>
+      variants.add(missingClose); variants.add(escapeXml(missingClose));
+      variants.add(missingOpen);  variants.add(escapeXml(missingOpen));
+    } else if (placeholder.startsWith("{{") && placeholder.endsWith("}}")) {
+      variants.add(placeholder.slice(0, -1));  // {{FOO}
+      variants.add(placeholder.slice(1));      // {FOO}}
+    } else if (placeholder.startsWith("((") && placeholder.endsWith("))")) {
+      variants.add(placeholder.slice(0, -1));  // ((FOO)
+      variants.add(placeholder.slice(1));      // (FOO))
+    } else if (placeholder.startsWith("[[") && placeholder.endsWith("]]")) {
+      variants.add(placeholder.slice(0, -1));  // [[FOO]
+      variants.add(placeholder.slice(1));      // [FOO]]
     }
 
     variants.forEach((variant) => {
@@ -366,13 +242,6 @@ export function decodeXml(value: string): string {
   return textarea.value;
 }
 
-export function cssEscape(value: string): string {
-  if (typeof window !== "undefined" && window.CSS && typeof window.CSS.escape === "function") {
-    return window.CSS.escape(value);
-  }
-  return value.replace(/(["\\])/g, "\\$1");
-}
-
 export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -384,11 +253,8 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function currentOutputName(selectedKey: TemplateKey | ""): string {
-  if (!selectedKey) {
-    return "translation";
-  }
-  const template = templateOptions[selectedKey];
+export function currentOutputName(customFileName?: string): string {
   const stamp = new Date().toISOString().slice(0, 10);
-  return `${template.outputName}-${stamp}`;
+  const base = (customFileName || "document").replace(/\.docx$/i, "").replace(/[^a-z0-9_-]/gi, "-");
+  return `${base}-filled-${stamp}`;
 }
