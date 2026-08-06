@@ -7,7 +7,10 @@
     "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:pdf-parser": "rm -rf src/pdf/tests/parser/.out && tsc -p src/pdf/tests/parser/tsconfig.tests.json && node --test src/pdf/tests/parser/.out/pdf/tests/parser/unit/parser.unit.test.js src/pdf/tests/parser/.out/pdf/tests/parser/unit/parser.edge-cases.test.js src/pdf/tests/parser/.out/pdf/tests/parser/integration/parser.integration.test.js",
+    "test:pdf-content": "rm -rf src/pdf/tests/content/.out && npx tsc -p src/pdf/tests/content/tsconfig.tests.json && node --test src/pdf/tests/content/.out/tests/content/unit/ContentLexer.test.js src/pdf/tests/content/.out/tests/content/unit/ContentParser.test.js src/pdf/tests/content/.out/tests/content/unit/TextExtractor.test.js src/pdf/tests/content/.out/tests/content/integration/ContentStream.integration.test.js src/pdf/tests/content/.out/tests/content/edge-cases/parser.edge-cases.test.js",
+    "bench:pdf-parser": "tsc -p src/pdf/tests/parser/tsconfig.tests.json && node src/pdf/tests/parser/.out/pdf/tests/parser/benchmark/parser.benchmark.js"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.10",

@@ -1,0 +1,19 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "outDir": "./.out",
+    "rootDir": "../../..",
+    "types": ["node"],
+    "incremental": false
+  },
+  "include": [
+    "../../parser/**/*.ts",
+    "./unit/**/*.ts",
+    "./integration/**/*.ts",
+    "./benchmark/**/*.ts"
+  ]
+}
