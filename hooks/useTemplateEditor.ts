@@ -11,7 +11,7 @@ import {
   type PlaceholderEntry,
 } from "@/lib/template";
 import type { FormValues, StatusType } from "@/types/editor";
-import { DOCX_MIME } from "@/lib/api-requests";
+import { DOCX_MIME, requestWordPreviewPdf } from "@/lib/api-requests";
 
 export function useTemplateEditor() {
   const [isUploaded, setIsUploaded] = useState(false);
@@ -26,6 +26,8 @@ export function useTemplateEditor() {
   const [status, setStatusMessage] = useState("");
   const [statusType, setStatusType] = useState<StatusType>("");
   const [previewHtml, setPreviewHtml] = useState("");
+  const [previewPdfBuffer, setPreviewPdfBuffer] = useState<ArrayBuffer | null>(null);
+  const [previewPdfVersion, setPreviewPdfVersion] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
 
   function applyStatus(message: string, type: StatusType) {
@@ -43,6 +45,8 @@ export function useTemplateEditor() {
     setBulkInput("");
     setBulkResult("");
     setBulkResultType("");
+    setPreviewPdfBuffer(null);
+    setPreviewPdfVersion(0);
     setPreviewHtml("");
   }
 
@@ -78,7 +82,7 @@ export function useTemplateEditor() {
       applyStatus(`${extracted.length} placeholder${extracted.length === 1 ? "" : "s"} detected.`, "success");
 
       const previewBlob = new Blob([buffer], { type: DOCX_MIME });
-      await renderPreview(previewBlob);
+      await renderPreview(previewBlob, file.name);
     } catch (error) {
       resetState();
       applyStatus(
@@ -179,7 +183,7 @@ export function useTemplateEditor() {
     });
   }
 
-  async function renderPreview(blob: Blob) {
+  async function renderHtmlPreview(blob: Blob) {
     const { renderAsync } = await import("docx-preview");
 
     // Separate containers so docx-preview puts CSS in <head> and HTML in <body>
@@ -192,12 +196,13 @@ export function useTemplateEditor() {
       ignoreWidth: false,
       ignoreHeight: false,
       breakPages: true,
-      useBase64URL: true,
+      ignoreLastRenderedPageBreak: false,
+      useBase64URL: false,
       renderHeaders: true,
       renderFooters: true,
       renderFootnotes: true,
       renderEndnotes: true,
-      experimental: true,
+      experimental: false,
       trimXmlDeclaration: true,
     });
 
@@ -211,15 +216,7 @@ export function useTemplateEditor() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${styleEl.innerHTML}
 <style>
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body { padding: 20px 12px; background: #e8ebee; }
-.docx-wrapper { background: transparent !important; padding: 0 !important; }
-.docx {
-  margin: 0 auto 20px !important;
-  box-shadow: 0 2px 18px rgba(0,0,0,0.14) !important;
-  background: #fff;
-}
+html, body { margin: 0; padding: 0; background: #e8ebee; }
 </style>
 </head>
 <body>${bodyEl.innerHTML}</body>
@@ -228,13 +225,33 @@ body { padding: 20px 12px; background: #e8ebee; }
     setPreviewHtml(standaloneDoc);
   }
 
+  async function renderPreview(blob: Blob, sourceName?: string) {
+    const docxBuffer = await blob.arrayBuffer();
+
+    try {
+      const pdfBuffer = await requestWordPreviewPdf(
+        sourceName || customFileName || "preview.docx",
+        docxBuffer,
+      );
+      setPreviewPdfBuffer(pdfBuffer.slice(0));
+      setPreviewPdfVersion((v) => v + 1);
+      setPreviewHtml("");
+      return;
+    } catch {
+      setPreviewPdfBuffer(null);
+      setPreviewPdfVersion(0);
+    }
+
+    await renderHtmlPreview(blob);
+  }
+
   async function handlePreviewUpdate() {
     if (!templateBuffer) return;
     setIsBusy(true);
     applyStatus("Rendering filled preview…", "");
     try {
       const blob = await buildDocxBlob();
-      await renderPreview(blob);
+      await renderPreview(blob, customFileName || "preview.docx");
       applyStatus("Preview updated with your values.", "success");
     } catch (error) {
       applyStatus(
@@ -253,7 +270,7 @@ body { padding: 20px 12px; background: #e8ebee; }
     try {
       const blob = await buildDocxBlob();
       downloadBlob(blob, `${currentOutputName(customFileName)}.docx`);
-      await renderPreview(blob);
+      await renderPreview(blob, customFileName || "preview.docx");
       applyStatus("MS Word file generated.", "success");
     } catch (error) {
       applyStatus(
@@ -286,10 +303,13 @@ body { padding: 20px 12px; background: #e8ebee; }
         ignoreWidth: false,
         ignoreHeight: false,
         breakPages: true,
-        useBase64URL: true,
+        ignoreLastRenderedPageBreak: false,
+        useBase64URL: false,
         renderHeaders: true,
         renderFooters: true,
-        experimental: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+        experimental: false,
       });
 
       const html2pdfModule = (await import("html2pdf.js")) as unknown as {
@@ -334,7 +354,6 @@ body { padding: 20px 12px; background: #e8ebee; }
     const next: FormValues = {};
     placeholders.forEach(({ token }) => { next[token] = ""; });
     setFormValues(next);
-    setPreviewHtml("");
     setBulkInput("");
     setBulkResult("");
     setBulkResultType("");
@@ -357,6 +376,8 @@ body { padding: 20px 12px; background: #e8ebee; }
     status,
     statusType,
     previewHtml,
+    previewPdfBuffer,
+    previewPdfVersion,
     isBusy,
     handleCustomUpload,
     handlePreviewUpdate,

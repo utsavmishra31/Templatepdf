@@ -21,14 +21,14 @@ type PdfJsModule = {
 
 async function renderOnePage(pdf: PdfJsDocumentProxy, pageNumber: number): Promise<string> {
   const page = await pdf.getPage(pageNumber);
-  const viewport = page.getViewport({ scale: 0.75 });
+  const viewport = page.getViewport({ scale: 1.5 });
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
   await page.render({ canvasContext: context, viewport }).promise;
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return canvas.toDataURL("image/png");
 }
 
 export async function renderSinglePdfPage(

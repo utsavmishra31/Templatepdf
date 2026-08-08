@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useTemplateEditor } from "@/hooks/useTemplateEditor";
 import { humanizePlaceholder } from "@/lib/template";
+import { HighFidelityPdfPreview } from "@/components/editor/HighFidelityPdfPreview";
 
 const UploadIcon = (
   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -100,9 +101,14 @@ export default function TemplateEditorPage() {
       className="animate-step-in -mt-8 flex overflow-hidden border-t border-slate-200 max-md:flex-col"
       style={{ height: "calc(100vh - 3.5rem)" }}
     >
-      {/* Left: isolated iframe */}
+      {/* Left: custom preview (no browser PDF toolbar) */}
       <div className="flex-1 min-w-0 overflow-y-auto bg-[#e8ebee]">
-        {editor.previewHtml ? (
+        {editor.previewPdfBuffer ? (
+          <HighFidelityPdfPreview
+            sourceBuffer={editor.previewPdfBuffer}
+            renderKey={editor.previewPdfVersion}
+          />
+        ) : editor.previewHtml ? (
           <iframe
             srcDoc={editor.previewHtml}
             title="Document preview"
