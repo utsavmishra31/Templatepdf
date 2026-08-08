@@ -32,18 +32,21 @@ export default function WordDeletePage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <DeleteWordPagesPanel
         uploadedWordName={tool.uploadedWordName}
         uploadedWordBuffer={tool.uploadedWordBuffer}
         uploadedWordPreviews={tool.uploadedWordPreviews}
         selectedWordPages={tool.selectedWordPages}
+        wordPageRangeInput={tool.wordPageRangeInput}
+        wordPageRangeError={tool.wordPageRangeError}
         wordStatus={tool.wordStatus}
         wordStatusType={tool.wordStatusType}
         isWordBusy={tool.isWordBusy}
         isBusy={false}
         onUploadWord={tool.handleUploadWord}
         onClearWord={tool.clearUploadedWord}
+        onWordPageRangeInputChange={tool.handleWordPageRangeInputChange}
         onDeleteSelectedWordPages={tool.handleDeleteSelectedWordPages}
         onToggleWordPageSelection={tool.toggleWordPageSelection}
         onDownloadWord={tool.handleDownloadWord}

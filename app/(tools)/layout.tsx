@@ -8,7 +8,7 @@ export default function ToolsLayout({
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-14 w-[min(1180px,calc(100%-32px))] items-center gap-4">
+        <div className="flex h-14 w-full items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
@@ -33,7 +33,7 @@ export default function ToolsLayout({
           <span className="text-sm font-semibold text-slate-400">PDF &amp; Doc Tools</span>
         </div>
       </header>
-      <main className="mx-auto w-[min(1180px,calc(100%-32px))] py-8">
+      <main className="w-full py-8 pl-4 pr-0 sm:pl-6 sm:pr-0 lg:pl-8 lg:pr-0">
         {children}
       </main>
     </div>
