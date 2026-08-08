@@ -21,6 +21,7 @@ export function useMergePdfTool() {
   const [mergePdfStatus, setMergePdfStatus] = useState("");
   const [mergePdfStatusType, setMergePdfStatusType] = useState<StatusType>("");
   const [isMergePdfBusy, setIsMergePdfBusy] = useState(false);
+  const [isAddingFiles, setIsAddingFiles] = useState(false);
 
   function applyMergePdfStatus(message: string, type: StatusType) {
     setMergePdfStatusType(type);
@@ -42,7 +43,7 @@ export function useMergePdfTool() {
       return;
     }
 
-    setIsMergePdfBusy(true);
+    setIsAddingFiles(true);
     applyMergePdfStatus(`Loading ${files.length} file(s)...`, "");
 
     try {
@@ -70,7 +71,7 @@ export function useMergePdfTool() {
         "error",
       );
     } finally {
-      setIsMergePdfBusy(false);
+      setIsAddingFiles(false);
     }
   }
 
@@ -157,6 +158,7 @@ export function useMergePdfTool() {
     mergePdfStatus,
     mergePdfStatusType,
     isMergePdfBusy,
+    isAddingFiles,
     handleAddMergePdfFiles,
     handleRemoveMergePdfFile,
     handleMoveMergePdfFile,
