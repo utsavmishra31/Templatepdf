@@ -11,6 +11,7 @@ type Props = {
   compressPdfResultSize: number;
   compressPdfStatus: string;
   compressPdfStatusType: StatusType;
+  compressPdfFirstPage: string | null;
   compressMode: "normal" | "extreme";
   isCompressPdfBusy: boolean;
   isBusy: boolean;
@@ -35,6 +36,7 @@ export function CompressPdfPanel({
   compressPdfResultSize,
   compressPdfStatus,
   compressPdfStatusType,
+  compressPdfFirstPage,
   compressMode,
   isCompressPdfBusy,
   isBusy,
@@ -73,7 +75,21 @@ export function CompressPdfPanel({
           aria-label="Compression info"
         >
           {compressPdfBuffer ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-3">
+              {compressPdfFirstPage && (
+                <div className="relative w-52">
+                  {/* Stacked cards behind for illusion of pages */}
+                  <div className="absolute left-2 top-2 h-full w-full rounded-lg border border-slate-300 bg-white/60 shadow-sm" />
+                  <div className="absolute left-1 top-1 h-full w-full rounded-lg border border-slate-300 bg-white/80 shadow-sm" />
+                  <div className="relative rounded-lg border border-slate-400 bg-white p-2.5 shadow-sm">
+                    <img
+                      src={compressPdfFirstPage}
+                      alt="Page 1 preview"
+                      className="h-auto w-full rounded-md bg-slate-50"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="rounded-lg bg-white/80 p-4 shadow-sm">
                 <p className="text-sm font-bold text-slate-700">Original file</p>
                 <p className="mt-1 text-sm font-medium text-slate-500">

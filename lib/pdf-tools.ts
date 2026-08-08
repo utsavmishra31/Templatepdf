@@ -41,15 +41,16 @@ export async function renderSinglePdfPage(
   return renderOnePage(pdf, pageNumber);
 }
 
-export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer): Promise<string[]> {
+export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer, maxPages?: number): Promise<string[]> {
   const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
   pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
   const loadingTask = pdfjs.getDocument({ data: sourceBuffer.slice(0) });
   const pdf = await loadingTask.promise;
   const previews: string[] = [];
+  const limit = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+  for (let pageNumber = 1; pageNumber <= limit; pageNumber += 1) {
     previews.push(await renderOnePage(pdf, pageNumber));
   }
 

@@ -42,6 +42,7 @@ export default function CompressPdfPage() {
         compressPdfResultSize={tool.compressPdfResultSize}
         compressPdfStatus={tool.compressPdfStatus}
         compressPdfStatusType={tool.compressPdfStatusType}
+        compressPdfFirstPage={tool.compressPdfFirstPage}
         compressMode={tool.compressMode}
         isCompressPdfBusy={tool.isCompressPdfBusy}
         isBusy={false}
