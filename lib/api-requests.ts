@@ -144,14 +144,12 @@ export async function requestPdfToWordConversion(
 export async function requestPdfCompression(
   fileName: string,
   sourceBuffer: ArrayBuffer,
-  quality: string,
 ): Promise<{ buffer: ArrayBuffer; compressedSize: number }> {
   const formData = new FormData();
   formData.set(
     "file",
     new File([sourceBuffer.slice(0)], fileName, { type: "application/pdf" }),
   );
-  formData.set("quality", quality);
 
   const response = await fetch("/api/pdf-compress", {
     method: "POST",

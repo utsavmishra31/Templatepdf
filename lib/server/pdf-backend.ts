@@ -48,7 +48,7 @@ async function compressPdfWithGhostscript(
         `-sOutputFile=${outputPath}`,
         inputPath,
       ],
-      { timeout: 120_000, maxBuffer: 50 * 1024 * 1024 },
+      { timeout: 300_000, maxBuffer: 50 * 1024 * 1024 },
     );
 
     return readFile(outputPath);
@@ -87,14 +87,13 @@ async function compressPdfWithLibreOffice(
       [
         "--headless",
         `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
-        "--infilter=writer_pdf_import",
         "--convert-to",
         `pdf:draw_pdf_Export:${filterParams}`,
         "--outdir",
         outputDir,
         inputPath,
       ],
-      { timeout: 120_000, maxBuffer: 50 * 1024 * 1024 },
+      { timeout: 300_000, maxBuffer: 50 * 1024 * 1024 },
     );
 
     return readFile(join(outputDir, "input.pdf"));
