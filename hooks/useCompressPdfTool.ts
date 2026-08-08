@@ -18,6 +18,7 @@ export function useCompressPdfTool() {
   const [compressPdfStatus, setCompressPdfStatus] = useState("");
   const [compressPdfStatusType, setCompressPdfStatusType] =
     useState<StatusType>("");
+  const [compressMode, setCompressMode] = useState<"normal" | "extreme">("normal");
   const [isCompressPdfBusy, setIsCompressPdfBusy] = useState(false);
 
   function applyCompressPdfStatus(message: string, type: StatusType) {
@@ -79,6 +80,7 @@ export function useCompressPdfTool() {
       const result = await requestPdfCompression(
         compressPdfName,
         compressPdfBuffer,
+        compressMode,
       );
       const compressedSize = result.compressedSize;
       const baseName = compressPdfName.replace(/\.pdf$/i, "") || "document";
@@ -122,7 +124,9 @@ export function useCompressPdfTool() {
     compressPdfResultSize,
     compressPdfStatus,
     compressPdfStatusType,
+    compressMode,
     isCompressPdfBusy,
+    setCompressMode,
     handleUploadCompressPdf,
     clearCompressPdf,
     handleCompressPdf,

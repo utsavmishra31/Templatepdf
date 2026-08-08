@@ -11,10 +11,12 @@ type Props = {
   compressPdfResultSize: number;
   compressPdfStatus: string;
   compressPdfStatusType: StatusType;
+  compressMode: "normal" | "extreme";
   isCompressPdfBusy: boolean;
   isBusy: boolean;
   onUploadCompressPdf: (event: ChangeEvent<HTMLInputElement>) => void;
   onClearCompressPdf: () => void;
+  onCompressModeChange: (mode: "normal" | "extreme") => void;
   onCompressPdf: () => void;
   onDownloadCompressedPdf: () => void;
 };
@@ -33,10 +35,12 @@ export function CompressPdfPanel({
   compressPdfResultSize,
   compressPdfStatus,
   compressPdfStatusType,
+  compressMode,
   isCompressPdfBusy,
   isBusy,
   onUploadCompressPdf,
   onClearCompressPdf,
+  onCompressModeChange,
   onCompressPdf,
   onDownloadCompressedPdf,
 }: Props) {
@@ -140,6 +144,27 @@ export function CompressPdfPanel({
               {compressPdfName
                 ? `${compressPdfName}${compressPdfOriginalSize > 0 ? ` • ${formatBytes(compressPdfOriginalSize)}` : ""}`
                 : "No PDF uploaded"}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3">
+            <p className="text-xs font-semibold text-slate-600">Compression mode</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["normal", "extreme"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onCompressModeChange(m)}
+                  disabled={isCompressPdfBusy || isBusy}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                    compressMode === m
+                      ? "border-teal-700 bg-teal-50 text-teal-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  <span className="block">{m === "normal" ? "Normal" : "Extreme"}</span>
+                </button>
+              ))}
             </div>
           </div>
 

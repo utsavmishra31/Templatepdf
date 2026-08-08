@@ -42,10 +42,12 @@ export default function CompressPdfPage() {
         compressPdfResultSize={tool.compressPdfResultSize}
         compressPdfStatus={tool.compressPdfStatus}
         compressPdfStatusType={tool.compressPdfStatusType}
+        compressMode={tool.compressMode}
         isCompressPdfBusy={tool.isCompressPdfBusy}
         isBusy={false}
         onUploadCompressPdf={tool.handleUploadCompressPdf}
         onClearCompressPdf={tool.clearCompressPdf}
+        onCompressModeChange={tool.setCompressMode}
         onCompressPdf={tool.handleCompressPdf}
         onDownloadCompressedPdf={tool.handleDownloadCompressedPdf}
       />

@@ -17,10 +17,12 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-// Max image dimension — images wider/taller than this are downscaled
-const MAX_IMAGE_PX = 800;
-// JPEG quality for recompressed images (lower = smaller, more aggressive)
-const JPEG_QUALITY = 20;
+export type CompressMode = "normal" | "extreme";
+
+const MODE_CONFIG = {
+  normal:  { maxImagePx: 1200, jpegQuality: 40, rasterize: true,  rasterDpi: 144, rasterJpegQuality: 72 },
+  extreme: { maxImagePx: 800,  jpegQuality: 20, rasterize: true,  rasterDpi: 96,  rasterJpegQuality: 30 },
+} as const;
 
 function toBuffer(source: ArrayBuffer | Uint8Array): Buffer {
   return Buffer.from(source instanceof Uint8Array ? source : source);
@@ -65,7 +67,11 @@ async function compressWithMutool(src: Buffer): Promise<Buffer> {
 
 // ─── 2. Enhanced pdf-lib + sharp image recompression ─────────────────────────
 
-async function compressWithPdfLibEnhanced(src: Buffer): Promise<Buffer> {
+async function compressWithPdfLibEnhanced(
+  src: Buffer,
+  maxImagePx: number,
+  jpegQuality: number,
+): Promise<Buffer> {
   const { PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFDict } =
     await import("pdf-lib");
 
@@ -138,15 +144,15 @@ async function compressWithPdfLibEnhanced(src: Buffer): Promise<Buffer> {
         const h = meta.height ?? 0;
 
         let pipeline = img.withMetadata({ exif: {} }); // strip EXIF
-        if (w > MAX_IMAGE_PX || h > MAX_IMAGE_PX) {
-          pipeline = pipeline.resize(MAX_IMAGE_PX, MAX_IMAGE_PX, {
+        if (w > maxImagePx || h > maxImagePx) {
+          pipeline = pipeline.resize(maxImagePx, maxImagePx, {
             fit: "inside",
             withoutEnlargement: true,
           });
         }
 
         const recompressed = await pipeline
-          .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+          .jpeg({ quality: jpegQuality, mozjpeg: true })
           .toBuffer();
 
         if (recompressed.length < obj.contents.length) {
@@ -154,8 +160,8 @@ async function compressWithPdfLibEnhanced(src: Buffer): Promise<Buffer> {
           for (const [k, v] of dict.entries()) newDict.set(k, v);
           newDict.set(PDFName.of("Length"), PDFNumber.of(recompressed.length));
           // Update dimensions if resized
-          if (w > MAX_IMAGE_PX || h > MAX_IMAGE_PX) {
-            const scale = MAX_IMAGE_PX / Math.max(w, h);
+          if (w > maxImagePx || h > maxImagePx) {
+            const scale = maxImagePx / Math.max(w, h);
             newDict.set(PDFName.of("Width"), PDFNumber.of(Math.round(w * scale)));
             newDict.set(PDFName.of("Height"), PDFNumber.of(Math.round(h * scale)));
           }
@@ -194,15 +200,15 @@ async function compressWithPdfLibEnhanced(src: Buffer): Promise<Buffer> {
             raw: { width: imgW, height: imgH, channels: channels as 1 | 3 },
           });
 
-          if (imgW > MAX_IMAGE_PX || imgH > MAX_IMAGE_PX) {
-            pipeline = pipeline.resize(MAX_IMAGE_PX, MAX_IMAGE_PX, {
+          if (imgW > maxImagePx || imgH > maxImagePx) {
+            pipeline = pipeline.resize(maxImagePx, maxImagePx, {
               fit: "inside",
               withoutEnlargement: true,
             });
           }
 
           const jpeg = await pipeline
-            .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+            .jpeg({ quality: jpegQuality, mozjpeg: true })
             .toBuffer();
 
           if (jpeg.length < obj.contents.length) {
@@ -277,9 +283,7 @@ async function compressWithPdfLib(src: Buffer): Promise<Buffer> {
 // Each page is rendered to a JPEG image at low DPI.
 // Note: text becomes non-selectable in the output (image-only PDF).
 
-async function compressWithRasterize(src: Buffer): Promise<Buffer> {
-  const DPI = 96;
-  const PAGE_JPEG_QUALITY = 30;
+async function compressWithRasterize(src: Buffer, dpi: number, pageJpegQuality: number): Promise<Buffer> {
 
   return withTempDir(async (dir) => {
     const input = join(dir, "in.pdf");
@@ -292,7 +296,7 @@ async function compressWithRasterize(src: Buffer): Promise<Buffer> {
       "mutool",
       [
         "draw",
-        "-r", String(DPI),
+        "-r", String(dpi),
         "-o", join(pagesDir, "page-%04d.png"),
         input,
       ],
@@ -312,14 +316,14 @@ async function compressWithRasterize(src: Buffer): Promise<Buffer> {
     for (const file of files) {
       const pngBuf = await readFile(join(pagesDir, file));
       const jpegBuf = await sharpLib(pngBuf)
-        .jpeg({ quality: PAGE_JPEG_QUALITY, mozjpeg: true })
+        .jpeg({ quality: pageJpegQuality, mozjpeg: true })
         .toBuffer();
       const meta = await sharpLib(jpegBuf).metadata();
       const jpegImage = await pdfDoc.embedJpg(jpegBuf);
 
       // Convert pixels → points (PDF unit = 1/72 inch)
-      const ptW = ((meta.width ?? 595) * 72) / DPI;
-      const ptH = ((meta.height ?? 842) * 72) / DPI;
+      const ptW = ((meta.width ?? 595) * 72) / dpi;
+      const ptH = ((meta.height ?? 842) * 72) / dpi;
       const page = pdfDoc.addPage([ptW, ptH]);
       page.drawImage(jpegImage, { x: 0, y: 0, width: ptW, height: ptH });
     }
@@ -332,37 +336,33 @@ async function compressWithRasterize(src: Buffer): Promise<Buffer> {
 
 /**
  * Compress a PDF using the best available method.
- * Returns whichever result is smallest.
+ * mode: "normal" = ~50% reduction, quality preserved, text searchable
+ *       "extreme" = ~80% reduction, pages rasterized to JPEG
  */
 export async function compressPdf(
   sourceBuffer: ArrayBuffer | Uint8Array,
+  mode: CompressMode = "normal",
 ): Promise<Buffer> {
   const src = toBuffer(sourceBuffer);
+  const { maxImagePx, jpegQuality, rasterize, rasterDpi, rasterJpegQuality } = MODE_CONFIG[mode];
   const results: Buffer[] = [];
 
-  // Try mutool — fast and effective structural compression
+  // Pass 1: mutool structural compression (both modes)
   try {
-    const mutoolResult = await compressWithMutool(src);
-    results.push(mutoolResult);
-  } catch {
-    // mutool not available or failed
-  }
+    results.push(await compressWithMutool(src));
+  } catch { /* mutool not available */ }
 
-  // Try enhanced pdf-lib — stream + image recompression
+  // Pass 2: stream + image recompression
   try {
     const base = results.length > 0 ? results[results.length - 1] : src;
-    const enhanced = await compressWithPdfLibEnhanced(base);
-    results.push(enhanced);
-  } catch {
-    // Enhanced compression failed
-  }
+    results.push(await compressWithPdfLibEnhanced(base, maxImagePx, jpegQuality));
+  } catch { /* enhanced compression failed */ }
 
-  // Try rasterization — converts pages to JPEG images (80%+ reduction target)
-  try {
-    const rasterized = await compressWithRasterize(src);
-    results.push(rasterized);
-  } catch {
-    // Rasterization failed
+  // Pass 3: rasterize (both modes, different quality)
+  if (rasterize) {
+    try {
+      results.push(await compressWithRasterize(src, rasterDpi, rasterJpegQuality));
+    } catch { /* rasterization failed */ }
   }
 
   // Last resort
@@ -374,6 +374,5 @@ export async function compressPdf(
     }
   }
 
-  // Return the smallest result
   return results.reduce((best, cur) => (cur.length < best.length ? cur : best));
 }
