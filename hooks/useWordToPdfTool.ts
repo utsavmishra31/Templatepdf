@@ -37,13 +37,35 @@ export function useWordToPdfTool() {
       return;
     }
 
-    const buffer = await file.arrayBuffer();
-    setWordToPdfName(file.name);
-    setWordToPdfBuffer(buffer);
-    applyWordToPdfStatus(
-      `${file.name} ready. Click Convert to download the PDF.`,
-      "success",
-    );
+    setIsWordToPdfBusy(true);
+    setWordToPdfResultBuffer(null);
+    setWordToPdfPreviews([]);
+    setWordToPdfResultName("");
+    applyWordToPdfStatus("Loading preview...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
+      const previews = await renderPdfPagePreviews(pdfBuffer);
+
+      setWordToPdfName(file.name);
+      setWordToPdfBuffer(buffer);
+      setWordToPdfPreviews(previews);
+      applyWordToPdfStatus(
+        `${file.name} ready — ${previews.length} page(s). Click Convert to PDF.`,
+        "success",
+      );
+    } catch (error) {
+      setWordToPdfName("");
+      setWordToPdfBuffer(null);
+      setWordToPdfPreviews([]);
+      applyWordToPdfStatus(
+        error instanceof Error ? error.message : "Failed to load preview.",
+        "error",
+      );
+    } finally {
+      setIsWordToPdfBusy(false);
+    }
   }
 
   function clearWordToPdf() {
@@ -63,7 +85,6 @@ export function useWordToPdfTool() {
 
     setIsWordToPdfBusy(true);
     setWordToPdfResultBuffer(null);
-    setWordToPdfPreviews([]);
     setWordToPdfResultName("");
     applyWordToPdfStatus("Converting to PDF...", "");
 

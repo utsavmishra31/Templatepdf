@@ -33,50 +33,116 @@ export function WordToPdfPanel({
   onDownloadWordToPdf,
 }: Props) {
   return (
-    <div className="mt-8 border-t border-dashed border-slate-300 pt-5">
-      <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-teal-800">
-            Word Utilities
-          </p>
-          <h3 className="font-[var(--font-newsreader)] text-2xl font-semibold text-slate-900">
-            Convert Word to PDF
-          </h3>
+    <section className="md:-mt-8" aria-labelledby="wordToolsTitle">
+      <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
+        <div
+          className="order-2 max-h-[calc(100dvh-3.5rem)] overflow-y-auto pt-4 pl-4 pr-2 md:order-1"
+          role="list"
+          aria-label="Converted Word to PDF pages"
+        >
+          {wordToPdfPreviews.length > 0 ? (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
+              {wordToPdfPreviews.map((previewSrc, index) => {
+                const pageNumber = index + 1;
+                return (
+                  <div
+                    key={pageNumber}
+                    className="grid cursor-default gap-2 rounded-lg bg-white/80 p-2.5 shadow-sm transition"
+                    role="listitem"
+                  >
+                    <span className="text-sm font-bold text-slate-800">
+                      Page {pageNumber}
+                    </span>
+                    <img
+                      src={previewSrc}
+                      alt={`Converted PDF page ${pageNumber}`}
+                      loading="lazy"
+                      className="h-auto w-full rounded-md bg-slate-50"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-bold text-slate-500">
+              Upload a Word file to preview pages on the left.
+            </div>
+          )}
         </div>
-        <span className="inline-flex min-h-[34px] items-center rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-700">
-          Word → PDF
-        </span>
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="relative inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-teal-700 bg-white px-4 font-extrabold text-teal-800">
-          <input
-            type="file"
-            accept="application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
-            onChange={onUploadWordToPdf}
-            disabled={isWordToPdfBusy || isBusy}
-            className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-progress"
-          />
-          Upload Word
-        </label>
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border border-slate-300 bg-transparent px-4 font-extrabold text-slate-600"
-          onClick={onClearWordToPdf}
-          disabled={isWordToPdfBusy || isBusy || !wordToPdfBuffer}
-        >
-          Clear
-        </button>
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800 disabled:opacity-50"
-          onClick={onConvertWordToPdf}
-          disabled={isWordToPdfBusy || isBusy || !wordToPdfBuffer}
-        >
-          Convert to PDF
-        </button>
-        <div className="text-sm font-bold text-slate-500">
-          {wordToPdfName ? wordToPdfName : "No file selected"}
+        <div className="order-1 flex h-full min-h-[calc(100dvh-3.5rem)] flex-col rounded-none border-y-0 border-l border-r-0 border-slate-200 bg-white p-4 shadow-none md:sticky md:top-14 md:order-2 md:w-[360px] md:self-stretch md:justify-self-end">
+          <div className="border-b border-slate-200 pb-3">
+            <p className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-teal-800">
+              Word Utilities
+            </p>
+            <h3
+              id="wordToolsTitle"
+              className="font-[var(--font-newsreader)] text-2xl font-semibold text-slate-900"
+            >
+              Convert to PDF
+            </h3>
+          </div>
+
+          {!wordToPdfBuffer && (
+            <div className="mt-3 flex flex-col gap-2.5">
+              <label className="relative inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800">
+                <input
+                  type="file"
+                  accept="application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                  onChange={onUploadWordToPdf}
+                  disabled={isWordToPdfBusy || isBusy}
+                  className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-progress"
+                />
+                Upload Word
+              </label>
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-col gap-2.5">
+            <div className="text-sm font-bold text-slate-500">
+              {wordToPdfName
+                ? `${wordToPdfName}`
+                : "No Word file uploaded"}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2.5 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold ${
+                wordToPdfBuffer
+                  ? "border-teal-700 bg-white text-teal-800"
+                  : "border-slate-300 bg-slate-100 text-slate-400"
+              }`}
+              onClick={onConvertWordToPdf}
+              disabled={isWordToPdfBusy || isBusy || !wordToPdfBuffer}
+            >
+              Convert to PDF
+              {isWordToPdfBusy && (
+                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`min-h-9 rounded-lg border px-3 text-sm font-semibold transition ${
+                wordToPdfResultBuffer
+                  ? "border-transparent bg-teal-700 text-white hover:bg-teal-800"
+                  : "border-slate-300 bg-slate-100 text-slate-400"
+              }`}
+              onClick={onDownloadWordToPdf}
+              disabled={isWordToPdfBusy || isBusy || !wordToPdfResultBuffer}
+            >
+              Download PDF
+            </button>
+            {wordToPdfResultName && (
+              <div className="text-sm font-bold text-slate-500">
+                {wordToPdfResultName}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -93,50 +159,6 @@ export function WordToPdfPanel({
       >
         {wordToPdfStatus}
       </p>
-
-      {wordToPdfPreviews.length > 0 && (
-        <>
-          <div
-            className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3"
-            role="list"
-            aria-label="Converted PDF pages"
-          >
-            {wordToPdfPreviews.map((previewSrc, index) => (
-              <div
-                key={index + 1}
-                className="grid gap-2 rounded-lg border border-slate-200 bg-white p-2.5"
-                role="listitem"
-              >
-                <span className="text-sm font-bold text-slate-800">
-                  Page {index + 1}
-                </span>
-                <img
-                  src={previewSrc}
-                  alt={`PDF page ${index + 1}`}
-                  loading="lazy"
-                  className="h-auto w-full rounded-md border border-slate-200 bg-slate-50"
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="min-h-11 rounded-lg border border-transparent bg-teal-700 px-4 font-extrabold text-white transition hover:bg-teal-800"
-              onClick={onDownloadWordToPdf}
-              disabled={isWordToPdfBusy || isBusy || !wordToPdfResultBuffer}
-            >
-              Download PDF
-            </button>
-            {wordToPdfResultName && (
-              <div className="text-sm font-bold text-slate-500">
-                {wordToPdfResultName}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+    </section>
   );
 }
