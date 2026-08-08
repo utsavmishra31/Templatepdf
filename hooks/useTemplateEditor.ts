@@ -284,58 +284,23 @@ html, body { margin: 0; padding: 0; background: #e8ebee; }
 
   async function handlePdfDownload() {
     setIsBusy(true);
-    applyStatus("Generating document...", "");
+    applyStatus("Generating PDF...", "");
 
     try {
       const blob = await buildDocxBlob();
+      const docxBuffer = await blob.arrayBuffer();
 
-      // Render DOCX into a temporary off-screen container so html2pdf.js
-      // can capture it — this avoids depending on the iframe preview DOM.
-      const { renderAsync } = await import("docx-preview");
-      const tempContainer = document.createElement("div");
-      tempContainer.style.cssText =
-        "position:fixed;left:-10000px;top:0;width:816px;z-index:-1;background:#fff;";
-      document.body.appendChild(tempContainer);
+      // Use the same server-side conversion as the preview so the downloaded
+      // PDF is byte-for-byte identical to what the user sees in the preview.
+      const pdfBuffer = await requestWordPreviewPdf(
+        customFileName || "document.docx",
+        docxBuffer,
+      );
 
-      await renderAsync(blob, tempContainer, undefined, {
-        className: "docx",
-        inWrapper: true,
-        ignoreWidth: false,
-        ignoreHeight: false,
-        breakPages: true,
-        ignoreLastRenderedPageBreak: false,
-        useBase64URL: false,
-        renderHeaders: true,
-        renderFooters: true,
-        renderFootnotes: true,
-        renderEndnotes: true,
-        experimental: false,
-      });
-
-      const html2pdfModule = (await import("html2pdf.js")) as unknown as {
-        default: () => {
-          set: (config: object) => {
-            from: (element: HTMLElement) => { save: () => Promise<void> };
-          };
-        };
-      };
-
-      const exportNode =
-        (tempContainer.querySelector(".docx-wrapper") as HTMLElement | null) ??
-        tempContainer;
-
-      await html2pdfModule
-        .default()
-        .set({
-          filename: `${currentOutputName(customFileName)}.pdf`,
-          margin: 0,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
-          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"] },
-        })
-        .from(exportNode)
-        .save();
+      downloadBlob(
+        new Blob([pdfBuffer], { type: "application/pdf" }),
+        `${currentOutputName(customFileName)}.pdf`,
+      );
 
       applyStatus("PDF file generated.", "success");
     } catch (error) {
@@ -344,8 +309,6 @@ html, body { margin: 0; padding: 0; background: #e8ebee; }
         "error",
       );
     } finally {
-      // Clean up temp container
-      document.querySelectorAll("div[style*='-10000px']").forEach((el) => el.remove());
       setIsBusy(false);
     }
   }
