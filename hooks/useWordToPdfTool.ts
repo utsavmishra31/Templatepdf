@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { DOCX_MIME, PDF_MIME, requestWordPreviewPdf } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -37,13 +37,48 @@ export function useWordToPdfTool() {
       return;
     }
 
-    const buffer = await file.arrayBuffer();
-    setWordToPdfName(file.name);
-    setWordToPdfBuffer(buffer);
-    applyWordToPdfStatus(
-      `${file.name} ready. Click Convert to download the PDF.`,
-      "success",
-    );
+    setIsWordToPdfBusy(true);
+    setWordToPdfResultBuffer(null);
+    setWordToPdfPreviews([]);
+    setWordToPdfResultName("");
+    applyWordToPdfStatus("Loading preview...", "");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      setWordToPdfName(file.name);
+      setWordToPdfBuffer(buffer);
+      setWordToPdfPreviews([]);
+
+      const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setWordToPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsWordToPdfBusy(false);
+          }
+        },
+      });
+
+      applyWordToPdfStatus(
+        `${file.name} ready — ${previews.length} page(s). Click Convert to PDF.`,
+        "success",
+      );
+    } catch (error) {
+      setWordToPdfName("");
+      setWordToPdfBuffer(null);
+      setWordToPdfPreviews([]);
+      applyWordToPdfStatus(
+        error instanceof Error ? error.message : "Failed to load preview.",
+        "error",
+      );
+    } finally {
+      setIsWordToPdfBusy(false);
+    }
   }
 
   function clearWordToPdf() {
@@ -63,7 +98,6 @@ export function useWordToPdfTool() {
 
     setIsWordToPdfBusy(true);
     setWordToPdfResultBuffer(null);
-    setWordToPdfPreviews([]);
     setWordToPdfResultName("");
     applyWordToPdfStatus("Converting to PDF...", "");
 
@@ -74,7 +108,13 @@ export function useWordToPdfTool() {
       );
       const baseName = wordToPdfName.replace(/\.docx$/i, "") || "document";
       const outputName = `${baseName}.pdf`;
-      const previews = await renderPdfPagePreviews(pdfBuffer);
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setWordToPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+        },
+      });
       setWordToPdfResultBuffer(pdfBuffer);
       setWordToPdfPreviews(previews);
       setWordToPdfResultName(outputName);

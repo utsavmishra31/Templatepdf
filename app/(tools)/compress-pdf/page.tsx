@@ -32,22 +32,23 @@ export default function CompressPdfPage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <CompressPdfPanel
         compressPdfName={tool.compressPdfName}
         compressPdfBuffer={tool.compressPdfBuffer}
         compressPdfOriginalSize={tool.compressPdfOriginalSize}
-        compressPdfQuality={tool.compressPdfQuality}
         compressPdfResultBuffer={tool.compressPdfResultBuffer}
         compressPdfResultName={tool.compressPdfResultName}
         compressPdfResultSize={tool.compressPdfResultSize}
         compressPdfStatus={tool.compressPdfStatus}
         compressPdfStatusType={tool.compressPdfStatusType}
+        compressPdfFirstPage={tool.compressPdfFirstPage}
+        compressMode={tool.compressMode}
         isCompressPdfBusy={tool.isCompressPdfBusy}
         isBusy={false}
         onUploadCompressPdf={tool.handleUploadCompressPdf}
         onClearCompressPdf={tool.clearCompressPdf}
-        onCompressPdfQualityChange={tool.setCompressPdfQuality}
+        onCompressModeChange={tool.setCompressMode}
         onCompressPdf={tool.handleCompressPdf}
         onDownloadCompressedPdf={tool.handleDownloadCompressedPdf}
       />

@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { getPdfPageCount, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -21,6 +21,7 @@ export function useMergePdfTool() {
   const [mergePdfStatus, setMergePdfStatus] = useState("");
   const [mergePdfStatusType, setMergePdfStatusType] = useState<StatusType>("");
   const [isMergePdfBusy, setIsMergePdfBusy] = useState(false);
+  const [isAddingFiles, setIsAddingFiles] = useState(false);
 
   function applyMergePdfStatus(message: string, type: StatusType) {
     setMergePdfStatusType(type);
@@ -42,19 +43,22 @@ export function useMergePdfTool() {
       return;
     }
 
-    setIsMergePdfBusy(true);
+    setIsAddingFiles(true);
     applyMergePdfStatus(`Loading ${files.length} file(s)...`, "");
 
     try {
       const newEntries = await Promise.all(
         files.map(async (file) => {
           const buffer = await file.arrayBuffer();
-          const previews = await renderPdfPagePreviews(buffer);
+          const [previews, pageCount] = await Promise.all([
+            renderPdfPagePreviews(buffer, 1),
+            getPdfPageCount(buffer),
+          ]);
           return {
             name: file.name,
             buffer,
             firstPageSrc: previews[0] ?? "",
-            pageCount: previews.length,
+            pageCount,
           };
         }),
       );
@@ -70,7 +74,7 @@ export function useMergePdfTool() {
         "error",
       );
     } finally {
-      setIsMergePdfBusy(false);
+      setIsAddingFiles(false);
     }
   }
 
@@ -157,6 +161,7 @@ export function useMergePdfTool() {
     mergePdfStatus,
     mergePdfStatusType,
     isMergePdfBusy,
+    isAddingFiles,
     handleAddMergePdfFiles,
     handleRemoveMergePdfFile,
     handleMoveMergePdfFile,

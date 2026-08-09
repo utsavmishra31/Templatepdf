@@ -3,7 +3,7 @@ import Link from "next/link";
 const tools = [
   {
     href: "/template-editor",
-    title: "Template Editor",
+    title: "Word Template Editor",
     description: "Fill in placeholders and download your document as Word or PDF.",
     badge: "Word & PDF",
     badgeColor: "bg-teal-50 text-teal-700 border-teal-100",
@@ -69,6 +69,22 @@ const tools = [
     ),
   },
   {
+    href: "/ppt-to-pdf",
+    title: "PPT to PDF",
+    description: "Convert a PPT or PPTX presentation into a PDF file.",
+    badge: "PPT → PDF",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12h14"/>
+        <path d="M12 5l7 7-7 7"/>
+        <circle cx="8" cy="8" r="2"/>
+      </svg>
+    ),
+  },
+  {
     href: "/pdf-to-word",
     title: "PDF to Word",
     description: "Convert a PDF document into an editable DOCX file.",
@@ -80,6 +96,22 @@ const tools = [
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 12H5"/>
         <path d="M12 19l-7-7 7-7"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/pdf-to-ppt",
+    title: "PDF to PPT",
+    description: "Convert a PDF document into an editable PowerPoint presentation.",
+    badge: "PDF → PPT",
+    badgeColor: "bg-cyan-50 text-cyan-700 border-cyan-100",
+    iconBg: "bg-cyan-50",
+    iconColor: "text-cyan-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 12h16"/>
+        <path d="M14 5l7 7-7 7"/>
+        <rect x="3" y="4" width="7" height="6" rx="1"/>
       </svg>
     ),
   },
@@ -134,6 +166,23 @@ const tools = [
     ),
   },
   {
+    href: "/crop-pdf",
+    title: "Crop PDF",
+    description: "Crop each page with per-page controls, then download the updated PDF.",
+    badge: "Crop",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M8 8h8v8H8z"/>
+        <path d="M3 12h3"/>
+        <path d="M18 12h3"/>
+      </svg>
+    ),
+  },
+  {
     href: "/split-pdf",
     title: "Split PDF",
     description: "Split one PDF into multiple files by defining custom page ranges.",
@@ -163,6 +212,41 @@ const tools = [
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/image-convert",
+    title: "Convert Image Type",
+    description: "Convert images between PNG, JPG, JPEG, WEBP, and AVIF formats.",
+    badge: "Image Convert",
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-100",
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+        <path d="M14 7h6"/>
+        <path d="M17 4l3 3-3 3"/>
+      </svg>
+    ),
+  },
+  {
+    href: "/image-resize",
+    title: "Image Resize",
+    description: "Resize images using ratio, exact pixel dimensions, or percentage scaling.",
+    badge: "Resize",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <path d="M9 9h6v6H9z"/>
+        <path d="M3 12h3"/>
+        <path d="M18 12h3"/>
       </svg>
     ),
   },

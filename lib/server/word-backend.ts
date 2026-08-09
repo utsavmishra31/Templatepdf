@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 function toBuffer(source: ArrayBuffer | Uint8Array) {
   if (source instanceof Uint8Array) {
@@ -190,4 +191,78 @@ export async function convertPdfToDocx(sourceBuffer: ArrayBuffer | Uint8Array): 
   });
 }
 
-export { DOCX_MIME };
+/**
+ * Convert a PDF to PPTX using LibreOffice's PDF import for Impress.
+ *
+ * Each PDF page is imported as a slide. Text-heavy PDFs generally retain
+ * editable text boxes; scanned/image-only PDFs become image-like slides.
+ */
+export async function convertPdfToPptx(sourceBuffer: ArrayBuffer | Uint8Array): Promise<Buffer> {
+  return withTempDir(async (directory) => {
+    const inputPath = join(directory, "input.pdf");
+    const outputDir = join(directory, "output");
+    const profilePath = join(directory, "lo-profile");
+
+    await writeFile(inputPath, toBuffer(sourceBuffer));
+    await mkdir(outputDir, { recursive: true });
+
+    await execFileAsync(
+      "soffice",
+      [
+        "--headless",
+        `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
+        "--infilter=impress_pdf_import",
+        "--convert-to",
+        "pptx:Impress MS PowerPoint 2007 XML",
+        "--outdir",
+        outputDir,
+        inputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 120_000,
+      },
+    );
+
+    const outputPath = join(outputDir, "input.pptx");
+    return readFile(outputPath);
+  });
+}
+
+/**
+ * Convert a PPT/PPTX file to PDF using LibreOffice Impress export.
+ */
+export async function convertPptToPdf(sourceBuffer: ArrayBuffer | Uint8Array): Promise<Buffer> {
+  return withTempDir(async (directory) => {
+    const inputPath = join(directory, "input.pptx");
+    const outputDir = join(directory, "output");
+    const profilePath = join(directory, "lo-profile");
+
+    await writeFile(inputPath, toBuffer(sourceBuffer));
+    await mkdir(outputDir, { recursive: true });
+
+    await execFileAsync(
+      "soffice",
+      [
+        "--headless",
+        `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
+        "--convert-to",
+        "pdf:impress_pdf_Export",
+        "--outdir",
+        outputDir,
+        inputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 120_000,
+      },
+    );
+
+    const outputPath = join(outputDir, "input.pdf");
+    return readFile(outputPath);
+  });
+}
+
+export { DOCX_MIME, PPTX_MIME };

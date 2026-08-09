@@ -4,6 +4,7 @@ import { type ChangeEvent, useState } from "react";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME, requestPdfCompression } from "@/lib/api-requests";
 import { formatBytes } from "@/lib/format-utils";
+import { renderPdfPagePreviews } from "@/lib/pdf-tools";
 import type { StatusType } from "@/types/editor";
 
 export function useCompressPdfTool() {
@@ -11,16 +12,15 @@ export function useCompressPdfTool() {
   const [compressPdfBuffer, setCompressPdfBuffer] =
     useState<ArrayBuffer | null>(null);
   const [compressPdfOriginalSize, setCompressPdfOriginalSize] = useState(0);
+  const [compressPdfFirstPage, setCompressPdfFirstPage] = useState<string | null>(null);
   const [compressPdfResultBuffer, setCompressPdfResultBuffer] =
     useState<ArrayBuffer | null>(null);
-  const [compressPdfQuality, setCompressPdfQuality] = useState<
-    "extreme" | "recommended" | "less"
-  >("recommended");
   const [compressPdfResultName, setCompressPdfResultName] = useState("");
   const [compressPdfResultSize, setCompressPdfResultSize] = useState(0);
   const [compressPdfStatus, setCompressPdfStatus] = useState("");
   const [compressPdfStatusType, setCompressPdfStatusType] =
     useState<StatusType>("");
+  const [compressMode, setCompressMode] = useState<"normal" | "extreme">("normal");
   const [isCompressPdfBusy, setIsCompressPdfBusy] = useState(false);
 
   function applyCompressPdfStatus(message: string, type: StatusType) {
@@ -50,16 +50,22 @@ export function useCompressPdfTool() {
     setCompressPdfResultBuffer(null);
     setCompressPdfResultName("");
     setCompressPdfResultSize(0);
+    setCompressPdfFirstPage(null);
     applyCompressPdfStatus(
       `${file.name} • ${formatBytes(file.size)}. Select quality and click Compress PDF.`,
       "success",
     );
+    // Generate first page preview in background
+    renderPdfPagePreviews(buffer, 1).then((pages) => {
+      setCompressPdfFirstPage(pages[0] ?? null);
+    }).catch(() => { /* ignore preview errors */ });
   }
 
   function clearCompressPdf() {
     setCompressPdfName("");
     setCompressPdfBuffer(null);
     setCompressPdfOriginalSize(0);
+    setCompressPdfFirstPage(null);
     setCompressPdfResultBuffer(null);
     setCompressPdfResultName("");
     setCompressPdfResultSize(0);
@@ -76,19 +82,13 @@ export function useCompressPdfTool() {
     setCompressPdfResultBuffer(null);
     setCompressPdfResultName("");
     setCompressPdfResultSize(0);
-    applyCompressPdfStatus("Compressing...", "");
+    applyCompressPdfStatus("Compressing… this may take a while for large PDFs.", "");
 
     try {
-      const QUALITY_MAP = {
-        extreme: "screen",
-        recommended: "ebook",
-        less: "printer",
-      } as const;
-
       const result = await requestPdfCompression(
         compressPdfName,
         compressPdfBuffer,
-        QUALITY_MAP[compressPdfQuality],
+        compressMode,
       );
       const compressedSize = result.compressedSize;
       const baseName = compressPdfName.replace(/\.pdf$/i, "") || "document";
@@ -127,14 +127,15 @@ export function useCompressPdfTool() {
     compressPdfName,
     compressPdfBuffer,
     compressPdfOriginalSize,
-    compressPdfQuality,
+    compressPdfFirstPage,
     compressPdfResultBuffer,
     compressPdfResultName,
     compressPdfResultSize,
     compressPdfStatus,
     compressPdfStatusType,
+    compressMode,
     isCompressPdfBusy,
-    setCompressPdfQuality,
+    setCompressMode,
     handleUploadCompressPdf,
     clearCompressPdf,
     handleCompressPdf,

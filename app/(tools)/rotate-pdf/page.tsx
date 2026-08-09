@@ -30,7 +30,7 @@ export default function RotatePdfPage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <RotatePdfPanel
         rotatePdfName={tool.rotatePdfName}
         rotatePdfBuffer={tool.rotatePdfBuffer}

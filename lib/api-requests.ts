@@ -1,6 +1,9 @@
 export const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const PDF_MIME = "application/pdf";
+export const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+export const PPT_MIME = "application/vnd.ms-powerpoint";
 
 export async function getApiErrorMessage(
   response: Response,
@@ -141,17 +144,65 @@ export async function requestPdfToWordConversion(
   return response.arrayBuffer();
 }
 
+export async function requestPdfToPptConversion(
+  fileName: string,
+  sourceBuffer: ArrayBuffer,
+): Promise<ArrayBuffer> {
+  const formData = new FormData();
+  formData.set(
+    "file",
+    new File([sourceBuffer.slice(0)], fileName, { type: "application/pdf" }),
+  );
+
+  const response = await fetch("/api/pdf-to-ppt", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "PDF to PPT conversion failed."),
+    );
+  }
+
+  return response.arrayBuffer();
+}
+
+export async function requestPptToPdfConversion(
+  fileName: string,
+  sourceBuffer: ArrayBuffer,
+): Promise<ArrayBuffer> {
+  const formData = new FormData();
+  formData.set(
+    "file",
+    new File([sourceBuffer.slice(0)], fileName, { type: PPTX_MIME }),
+  );
+
+  const response = await fetch("/api/ppt-to-pdf", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "PPT to PDF conversion failed."),
+    );
+  }
+
+  return response.arrayBuffer();
+}
+
 export async function requestPdfCompression(
   fileName: string,
   sourceBuffer: ArrayBuffer,
-  quality: string,
+  mode: "normal" | "extreme",
 ): Promise<{ buffer: ArrayBuffer; compressedSize: number }> {
   const formData = new FormData();
   formData.set(
     "file",
     new File([sourceBuffer.slice(0)], fileName, { type: "application/pdf" }),
   );
-  formData.set("quality", quality);
+  formData.set("mode", mode);
 
   const response = await fetch("/api/pdf-compress", {
     method: "POST",
@@ -175,5 +226,105 @@ export async function requestPdfCompression(
     compressedSize: Number.isFinite(compressedSize)
       ? compressedSize
       : buffer.byteLength,
+  };
+}
+
+export type ImageConvertFormat = "png" | "jpg" | "jpeg" | "webp" | "avif";
+
+export async function requestImageConversion(
+  files: File[],
+  outputFormat: ImageConvertFormat,
+): Promise<{
+  buffer: ArrayBuffer;
+  contentType: string;
+  fileName: string;
+  outputKind: "single" | "zip";
+}> {
+  const formData = new FormData();
+  formData.set("format", outputFormat);
+
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch("/api/image-convert", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "Image conversion failed."),
+    );
+  }
+
+  return {
+    buffer: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+    fileName: response.headers.get("x-output-filename") || "converted-file",
+    outputKind:
+      response.headers.get("x-output-kind") === "zip" ? "zip" : "single",
+  };
+}
+
+export type ImageResizeMode = "ratio" | "pixel" | "percentage";
+
+export type ImageResizeOptions =
+  | {
+      mode: "ratio";
+      ratioNumerator: number;
+      ratioDenominator: number;
+    }
+  | {
+      mode: "pixel";
+      width: number;
+      height: number;
+    }
+  | {
+      mode: "percentage";
+      percentage: number;
+    };
+
+export async function requestImageResize(
+  files: File[],
+  options: ImageResizeOptions,
+): Promise<{
+  buffer: ArrayBuffer;
+  contentType: string;
+  fileName: string;
+  outputKind: "single" | "zip";
+}> {
+  const formData = new FormData();
+  formData.set("mode", options.mode);
+
+  if (options.mode === "ratio") {
+    formData.set("ratioNumerator", String(options.ratioNumerator));
+    formData.set("ratioDenominator", String(options.ratioDenominator));
+  } else if (options.mode === "pixel") {
+    formData.set("width", String(options.width));
+    formData.set("height", String(options.height));
+  } else {
+    formData.set("percentage", String(options.percentage));
+  }
+
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch("/api/image-resize", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Image resize failed."));
+  }
+
+  return {
+    buffer: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+    fileName: response.headers.get("x-output-filename") || "resized-file",
+    outputKind:
+      response.headers.get("x-output-kind") === "zip" ? "zip" : "single",
   };
 }

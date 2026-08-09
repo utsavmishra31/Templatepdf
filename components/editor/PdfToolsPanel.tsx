@@ -14,6 +14,8 @@ type PdfToolsPanelProps = {
   uploadedPdfBuffer: ArrayBuffer | null;
   uploadedPdfPreviews: string[];
   selectedPdfPages: number[];
+  pdfPageRangeInput: string;
+  pdfPageRangeError: string;
   pdfStatus: string;
   pdfStatusType: StatusType;
   isPdfBusy: boolean;
@@ -21,16 +23,20 @@ type PdfToolsPanelProps = {
   uploadedWordBuffer: ArrayBuffer | null;
   uploadedWordPreviews: string[];
   selectedWordPages: number[];
+  wordPageRangeInput: string;
+  wordPageRangeError: string;
   wordStatus: string;
   wordStatusType: StatusType;
   isWordBusy: boolean;
   isBusy: boolean;
   onUploadPdf: (event: ChangeEvent<HTMLInputElement>) => void;
   onClearPdf: () => void;
+  onPdfPageRangeInputChange: (value: string) => void;
   onDeleteSelectedPages: () => void;
   onTogglePageSelection: (pageNumber: number) => void;
   onUploadWord: (event: ChangeEvent<HTMLInputElement>) => void;
   onClearWord: () => void;
+  onWordPageRangeInputChange: (value: string) => void;
   onDeleteSelectedWordPages: () => void;
   onToggleWordPageSelection: (pageNumber: number) => void;
   wordToPdfName: string;
@@ -122,12 +128,15 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         uploadedPdfBuffer={props.uploadedPdfBuffer}
         uploadedPdfPreviews={props.uploadedPdfPreviews}
         selectedPdfPages={props.selectedPdfPages}
+        pdfPageRangeInput={props.pdfPageRangeInput}
+        pdfPageRangeError={props.pdfPageRangeError}
         pdfStatus={props.pdfStatus}
         pdfStatusType={props.pdfStatusType}
         isPdfBusy={props.isPdfBusy}
         isBusy={props.isBusy}
         onUploadPdf={props.onUploadPdf}
         onClearPdf={props.onClearPdf}
+        onPdfPageRangeInputChange={props.onPdfPageRangeInputChange}
         onDeleteSelectedPages={props.onDeleteSelectedPages}
         onTogglePageSelection={props.onTogglePageSelection}
         onDownloadPdf={props.onDownloadPdf}
@@ -137,12 +146,15 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         uploadedWordBuffer={props.uploadedWordBuffer}
         uploadedWordPreviews={props.uploadedWordPreviews}
         selectedWordPages={props.selectedWordPages}
+        wordPageRangeInput={props.wordPageRangeInput}
+        wordPageRangeError={props.wordPageRangeError}
         wordStatus={props.wordStatus}
         wordStatusType={props.wordStatusType}
         isWordBusy={props.isWordBusy}
         isBusy={props.isBusy}
         onUploadWord={props.onUploadWord}
         onClearWord={props.onClearWord}
+        onWordPageRangeInputChange={props.onWordPageRangeInputChange}
         onDeleteSelectedWordPages={props.onDeleteSelectedWordPages}
         onToggleWordPageSelection={props.onToggleWordPageSelection}
         onDownloadWord={props.onDownloadWord}

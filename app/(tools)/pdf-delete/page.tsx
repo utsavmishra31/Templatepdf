@@ -32,18 +32,21 @@ export default function PdfDeletePage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <DeletePdfPagesPanel
         uploadedPdfName={tool.uploadedPdfName}
         uploadedPdfBuffer={tool.uploadedPdfBuffer}
         uploadedPdfPreviews={tool.uploadedPdfPreviews}
         selectedPdfPages={tool.selectedPdfPages}
+        pdfPageRangeInput={tool.pdfPageRangeInput}
+        pdfPageRangeError={tool.pdfPageRangeError}
         pdfStatus={tool.pdfStatus}
         pdfStatusType={tool.pdfStatusType}
         isPdfBusy={tool.isPdfBusy}
         isBusy={false}
         onUploadPdf={tool.handleUploadPdf}
         onClearPdf={tool.clearUploadedPdf}
+        onPdfPageRangeInputChange={tool.handlePdfPageRangeInputChange}
         onDeleteSelectedPages={tool.handleDeleteSelectedPdfPages}
         onTogglePageSelection={tool.togglePdfPageSelection}
         onDownloadPdf={tool.handleDownloadPdf}

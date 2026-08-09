@@ -26,10 +26,23 @@ export function DocumentPreview({ previewVisible, previewBadge, previewHtml }: D
         </span>
       </div>
       <div
-        className="doc-preview mt-4 min-h-[240px] overflow-auto rounded-lg border border-slate-200 bg-slate-100 p-4"
+        className="mt-4 min-h-[240px] overflow-auto rounded-lg border border-slate-200 bg-[#e8ebee]"
         id="docPreview"
-        dangerouslySetInnerHTML={{ __html: previewHtml }}
-      />
+      >
+        <iframe
+          srcDoc={previewHtml}
+          title="Generated document preview"
+          className="w-full border-0 block"
+          style={{ minHeight: "480px" }}
+          onLoad={(e) => {
+            try {
+              const f = e.currentTarget;
+              const h = f.contentDocument?.documentElement.scrollHeight ?? 0;
+              if (h > 0) f.style.height = h + "px";
+            } catch {}
+          }}
+        />
+      </div>
     </section>
   );
 }

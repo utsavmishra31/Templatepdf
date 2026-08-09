@@ -42,7 +42,7 @@ export default function JpgToPdfPage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <JpgToPdfPanel
         images={tool.images}
         orientation={tool.orientation}

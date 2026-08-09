@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -57,9 +57,26 @@ export function useRearrangePdfTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const previews = await renderPdfPagePreviews(buffer);
       setRearrangePdfName(file.name);
       setRearrangePdfBuffer(buffer);
+
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setRearrangePages((prev) => {
+            const slots = mergePreviewSlots(
+              prev.map((p) => p.previewSrc),
+              nextPreviews,
+              update.total,
+            );
+            return slots.map((previewSrc, i) => ({
+              originalIndex: i,
+              previewSrc,
+              rotation: 0,
+            }));
+          });
+        },
+      });
+
       setRearrangePages(
         previews.map((previewSrc, i) => ({ originalIndex: i, previewSrc, rotation: 0 })),
       );

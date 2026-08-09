@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import {
   DOCX_MIME,
@@ -10,6 +10,78 @@ import {
   requestWordPreviewPdf,
 } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
+
+function formatPageRanges(pageNumbers: number[]) {
+  if (!pageNumbers.length) return "";
+
+  const ranges: string[] = [];
+  let rangeStart = pageNumbers[0];
+  let previous = pageNumbers[0];
+
+  for (let index = 1; index <= pageNumbers.length; index += 1) {
+    const current = pageNumbers[index];
+    if (current === previous + 1) {
+      previous = current;
+      continue;
+    }
+
+    ranges.push(rangeStart === previous ? `${rangeStart}` : `${rangeStart}-${previous}`);
+    rangeStart = current;
+    previous = current;
+  }
+
+  return ranges.join(",");
+}
+
+function parsePageRanges(value: string, totalPages: number) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { pages: [] as number[], error: "" };
+  }
+
+  const selectedPages = new Set<number>();
+  const segments = trimmed.split(",").map((segment) => segment.trim()).filter(Boolean);
+
+  for (const segment of segments) {
+    if (/^\d+$/.test(segment)) {
+      const pageNumber = Number(segment);
+      if (pageNumber < 1 || pageNumber > totalPages) {
+        return { pages: [] as number[], error: `Page ${pageNumber} is out of range.` };
+      }
+      selectedPages.add(pageNumber);
+      continue;
+    }
+
+    const rangeMatch = segment.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (!rangeMatch) {
+      return {
+        pages: [] as number[],
+        error: "Use page numbers like 1,2,3-5.",
+      };
+    }
+
+    const rangeStart = Number(rangeMatch[1]);
+    const rangeEnd = Number(rangeMatch[2]);
+    if (rangeStart < 1 || rangeEnd > totalPages) {
+      return {
+        pages: [] as number[],
+        error: `Pages must stay between 1 and ${totalPages}.`,
+      };
+    }
+    if (rangeStart > rangeEnd) {
+      return {
+        pages: [] as number[],
+        error: `Invalid range ${segment}.`,
+      };
+    }
+
+    for (let pageNumber = rangeStart; pageNumber <= rangeEnd; pageNumber += 1) {
+      selectedPages.add(pageNumber);
+    }
+  }
+
+  return { pages: Array.from(selectedPages).sort((a, b) => a - b), error: "" };
+}
 
 export function useWordDeleteTool() {
   const [uploadedWordName, setUploadedWordName] = useState("");
@@ -22,6 +94,8 @@ export function useWordDeleteTool() {
     [],
   );
   const [selectedWordPages, setSelectedWordPages] = useState<number[]>([]);
+  const [wordPageRangeInput, setWordPageRangeInput] = useState("");
+  const [wordPageRangeError, setWordPageRangeError] = useState("");
   const [wordStatus, setWordStatus] = useState("");
   const [wordStatusType, setWordStatusType] = useState<StatusType>("");
   const [isWordBusy, setIsWordBusy] = useState(false);
@@ -44,22 +118,38 @@ export function useWordDeleteTool() {
     }
 
     setIsWordBusy(true);
-    applyWordStatus("Converting to PDF for exact page preview\u2026", "");
+      applyWordStatus("Loading Word file...", "");
 
     try {
       const buffer = await file.arrayBuffer();
+      setUploadedWordName(file.name);
+      setUploadedWordBuffer(buffer);
+      setUploadedWordPreviews([]);
+
       const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
-      const previews = await renderPdfPagePreviews(pdfBuffer);
+      setWorkingPdfBuffer(pdfBuffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setUploadedWordPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsWordBusy(false);
+          }
+        },
+      });
 
       if (!previews.length) {
         throw new Error("The uploaded Word file has no previewable pages.");
       }
 
-      setUploadedWordName(file.name);
-      setUploadedWordBuffer(buffer);
-      setWorkingPdfBuffer(pdfBuffer);
       setUploadedWordPreviews(previews);
       setSelectedWordPages([]);
+      setWordPageRangeInput("");
+      setWordPageRangeError("");
       applyWordStatus(
         `Loaded ${previews.length} page(s). Select pages you want to delete.`,
         "success",
@@ -70,6 +160,8 @@ export function useWordDeleteTool() {
       setWorkingPdfBuffer(null);
       setUploadedWordPreviews([]);
       setSelectedWordPages([]);
+      setWordPageRangeInput("");
+      setWordPageRangeError("");
       applyWordStatus(
         error instanceof Error
           ? error.message
@@ -87,16 +179,55 @@ export function useWordDeleteTool() {
     setWorkingPdfBuffer(null);
     setUploadedWordPreviews([]);
     setSelectedWordPages([]);
+    setWordPageRangeInput("");
+    setWordPageRangeError("");
     applyWordStatus("Word selection cleared.", "success");
   }
 
   function toggleWordPageSelection(pageNumber: number) {
     setSelectedWordPages((previous) => {
+      let nextPages: number[];
+
       if (previous.includes(pageNumber)) {
-        return previous.filter((item) => item !== pageNumber);
+        nextPages = previous.filter((item) => item !== pageNumber);
+      } else {
+        nextPages = [...previous, pageNumber].sort((a, b) => a - b);
       }
-      return [...previous, pageNumber].sort((a, b) => a - b);
+
+      setWordPageRangeInput(formatPageRanges(nextPages));
+      setWordPageRangeError("");
+      return nextPages;
     });
+  }
+
+  function handleWordPageRangeInputChange(value: string) {
+    setWordPageRangeInput(value);
+
+    if (!uploadedWordPreviews.length) {
+      setSelectedWordPages([]);
+      setWordPageRangeError("");
+      return;
+    }
+
+    const parsed = parsePageRanges(value, uploadedWordPreviews.length);
+    if (parsed.error) {
+      setSelectedWordPages([]);
+      setWordPageRangeError(parsed.error);
+      applyWordStatus(parsed.error, "error");
+      return;
+    }
+
+    setSelectedWordPages(parsed.pages);
+    setWordPageRangeError("");
+    if (!value.trim()) {
+      applyWordStatus("Selection cleared. Enter pages to delete.", "success");
+      return;
+    }
+
+    applyWordStatus(
+      `Selected ${parsed.pages.length} page(s) for deletion.`,
+      "success",
+    );
   }
 
   async function handleDeleteSelectedWordPages() {
@@ -120,11 +251,19 @@ export function useWordDeleteTool() {
         workingPdfBuffer,
         selectedWordPages,
       );
-      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer);
+      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer, undefined, {
+        onUpdate: (partialPreviews, update) => {
+          setUploadedWordPreviews((prev) =>
+            mergePreviewSlots(prev, partialPreviews, update.total),
+          );
+        },
+      });
 
       setWorkingPdfBuffer(result.nextBuffer);
       setUploadedWordPreviews(nextPreviews);
       setSelectedWordPages([]);
+      setWordPageRangeInput("");
+      setWordPageRangeError("");
       applyWordStatus(
         `Deleted ${result.removedCount} page(s). Review the pages below, then click Download DOCX.`,
         "success",
@@ -174,12 +313,15 @@ export function useWordDeleteTool() {
     uploadedWordBuffer,
     uploadedWordPreviews,
     selectedWordPages,
+    wordPageRangeInput,
+    wordPageRangeError,
     wordStatus,
     wordStatusType,
     isWordBusy,
     handleUploadWord,
     clearUploadedWord,
     toggleWordPageSelection,
+    handleWordPageRangeInputChange,
     handleDeleteSelectedWordPages,
     handleDownloadWord,
   };

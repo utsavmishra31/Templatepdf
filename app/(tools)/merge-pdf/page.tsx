@@ -32,7 +32,7 @@ export default function MergePdfPage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <MergePdfPanel
         mergePdfFiles={tool.mergePdfFiles.map((f) => ({
           name: f.name,
@@ -44,6 +44,7 @@ export default function MergePdfPage() {
         mergePdfStatus={tool.mergePdfStatus}
         mergePdfStatusType={tool.mergePdfStatusType}
         isMergePdfBusy={tool.isMergePdfBusy}
+        isAddingFiles={tool.isAddingFiles}
         isBusy={false}
         onAddMergePdfFiles={tool.handleAddMergePdfFiles}
         onRemoveMergePdfFile={tool.handleRemoveMergePdfFile}

@@ -32,7 +32,7 @@ export default function SplitPdfPage() {
   }
 
   return (
-    <div className="animate-step-in rounded-xl border border-slate-200 bg-white p-7 shadow-sm max-md:p-5">
+    <div className="animate-step-in">
       <SplitPdfPanel
         splitPdfName={tool.splitPdfName}
         splitPdfBuffer={tool.splitPdfBuffer}

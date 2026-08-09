@@ -1,117 +1,92 @@
 "use client";
 
-import { type ChangeEvent, useMemo, useState } from "react";
+import { useState } from "react";
 import JSZip from "jszip";
 import {
   currentOutputName,
   downloadBlob,
   extractPlaceholders,
-  getAutomaticDateReplacements,
-  getDisplayPlaceholders,
-  getDropdownLookupKey,
-  getDropdownOptions,
-  isAutomaticDatePlaceholder,
-  normalizeDateValue,
-  parseBulkPlaceholderValues,
+  parseBulkInput,
   replaceXmlTokens,
-  templateOptions,
   type PlaceholderEntry,
-  type TabType,
-  type TemplateKey,
 } from "@/lib/template";
 import type { FormValues, StatusType } from "@/types/editor";
-import { DOCX_MIME } from "@/lib/api-requests";
+import { DOCX_MIME, requestWordPreviewPdf } from "@/lib/api-requests";
 
 export function useTemplateEditor() {
-  const [selectedKey, setSelectedKey] = useState<TemplateKey | "">("");
-  const [templateBuffer, setTemplateBuffer] = useState<ArrayBuffer | null>(
-    null,
-  );
+  const [isUploaded, setIsUploaded] = useState(false);
+  const [templateBuffer, setTemplateBuffer] = useState<ArrayBuffer | null>(null);
+  const [customFileName, setCustomFileName] = useState("");
   const [placeholders, setPlaceholders] = useState<PlaceholderEntry[]>([]);
   const [formValues, setFormValues] = useState<FormValues>({});
+  const [activeTab, setActiveTab] = useState<"fields" | "bulk">("fields");
   const [bulkInput, setBulkInput] = useState("");
   const [bulkResult, setBulkResult] = useState("");
   const [bulkResultType, setBulkResultType] = useState<StatusType>("");
-  const [activeTab, setActiveTab] = useState<TabType>("bulk");
   const [status, setStatusMessage] = useState("");
   const [statusType, setStatusType] = useState<StatusType>("");
   const [previewHtml, setPreviewHtml] = useState("");
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewBadge, setPreviewBadge] = useState("Ready");
+  const [previewPdfBuffer, setPreviewPdfBuffer] = useState<ArrayBuffer | null>(null);
+  const [previewPdfVersion, setPreviewPdfVersion] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
-
-  const displayedPlaceholders = useMemo(
-    () => getDisplayPlaceholders(selectedKey, placeholders),
-    [selectedKey, placeholders],
-  );
 
   function applyStatus(message: string, type: StatusType) {
     setStatusType(type);
     setStatusMessage(message);
   }
 
-  function resetTemplateState(nextKey: TemplateKey | "") {
-    setSelectedKey(nextKey);
+  function resetState() {
+    setIsUploaded(false);
     setTemplateBuffer(null);
+    setCustomFileName("");
     setPlaceholders([]);
     setFormValues({});
+    setActiveTab("fields");
     setBulkInput("");
     setBulkResult("");
     setBulkResultType("");
-    setActiveTab("bulk");
-    setPreviewVisible(false);
+    setPreviewPdfBuffer(null);
+    setPreviewPdfVersion(0);
     setPreviewHtml("");
-    setPreviewBadge("Ready");
   }
 
-  async function handleTemplateChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextKey = event.target.value as TemplateKey | "";
-    resetTemplateState(nextKey);
-
-    if (!nextKey) {
-      applyStatus("", "");
+  async function handleCustomUpload(file: File) {
+    if (!file.name.toLowerCase().endsWith(".docx")) {
+      applyStatus("Only .docx files are supported.", "error");
       return;
     }
 
+    resetState();
     setIsBusy(true);
-    applyStatus("Loading template...", "");
+    applyStatus("Reading document...", "");
 
     try {
-      const config = templateOptions[nextKey];
-      const response = await fetch(config.templatePath);
-      if (!response.ok) {
-        throw new Error(`Template file not found: ${config.templatePath}`);
-      }
-
-      const buffer = await response.arrayBuffer();
+      const buffer = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(buffer.slice(0));
       const extracted = await extractPlaceholders(zip);
 
       if (!extracted.length) {
         throw new Error(
-          "No <<PLACEHOLDER>> values were found in this template.",
+          "No placeholders found. Use <<NAME>>, {{NAME}}, ((NAME)), or [[NAME]] in your document.",
         );
       }
 
-      const defaults = getAutomaticDateReplacements();
       const values: FormValues = {};
-      extracted.forEach(({ token }) => {
-        values[token] = isAutomaticDatePlaceholder(token)
-          ? defaults[token]
-          : "";
-      });
+      extracted.forEach(({ token }) => { values[token] = ""; });
 
-      setSelectedKey(nextKey);
+      setIsUploaded(true);
+      setCustomFileName(file.name);
       setTemplateBuffer(buffer);
       setPlaceholders(extracted);
       setFormValues(values);
-      applyStatus("Template ready.", "success");
+      applyStatus(`${extracted.length} placeholder${extracted.length === 1 ? "" : "s"} detected.`, "success");
+
+      const previewBlob = new Blob([buffer], { type: DOCX_MIME });
+      await renderPreview(previewBlob, file.name);
     } catch (error) {
-      resetTemplateState("");
+      resetState();
       applyStatus(
-        error instanceof Error
-          ? error.message
-          : "Template could not be loaded.",
+        error instanceof Error ? error.message : "Could not read the document.",
         "error",
       );
     } finally {
@@ -119,226 +94,173 @@ export function useTemplateEditor() {
     }
   }
 
-  function normalizeDropdownValue(placeholder: string, value: string) {
-    const options = getDropdownOptions(placeholder);
-    if (!options.length) return normalizeDateValue(value);
-
-    const trimmed = String(value || "").trim();
-    if (!trimmed) return trimmed;
-
-    const normalized = getDropdownLookupKey(trimmed);
-    const optionMatch = options.find(
-      (option) => getDropdownLookupKey(option) === normalized,
-    );
-    if (optionMatch) return optionMatch;
-
-    const aliases = {
-      "<<TITLE>>": [
-        { value: "Sr.", aliases: ["Mr.", "Mr", "Mister", "Shri", "Sh."] },
-        {
-          value: "Sra.",
-          aliases: ["Ms.", "Ms", "Mrs.", "Mrs", "Miss", "Madam", "Smt.", "Smt"],
-        },
-      ],
-      "<<RELATION>>": [
-        { value: "hijo de", aliases: ["S/o", "S / O", "Son of", "Son"] },
-        {
-          value: "hija de",
-          aliases: ["D/o", "D / O", "Daughter of", "Daughter"],
-        },
-        {
-          value: "mujer de",
-          aliases: [
-            "W/o",
-            "W / O",
-            "Wife of",
-            "Wife",
-            "Spouse of",
-            "Spouse",
-          ],
-        },
-      ],
-      "<<TYPE>>": [
-        {
-          value: "VISADO DE TURISTA",
-          aliases: ["Tourist Visa", "Tourism Visa", "Visitor Visa", "Visit Visa"],
-        },
-        {
-          value: "VISADO / ESTANCIA A LARGO PLAZO",
-          aliases: [
-            "Long Term Visa",
-            "Long-Term Visa",
-            "Long Term Stay",
-            "Long-Term Stay",
-            "Long Stay Visa",
-          ],
-        },
-        {
-          value: "FINES DE INMIGRACIÓN DISTINTOS DE LA CIUDADANÍA",
-          aliases: [
-            "Immigration Purposes Other Than Citizenship",
-            "Immigration Other Than Citizenship",
-            "Immigration Purpose",
-            "Immigration Purposes",
-          ],
-        },
-        {
-          value: "SOLICITUD DE CIUDADANÍA/NACIONALIDAD",
-          aliases: [
-            "Citizenship Application",
-            "Nationality Application",
-            "Citizenship/Nationality Application",
-            "Application for Citizenship",
-            "Application for Nationality",
-          ],
-        },
-        {
-          value: "PERMISO DE RESIDENCIA",
-          aliases: ["Residence Permit", "Residency Permit", "Resident Permit"],
-        },
-        {
-          value: "EMPLEO / VISADO DE EMPLEO / PERMISO DE TRABAJO",
-          aliases: [
-            "Employment",
-            "Employment Visa",
-            "Work Permit",
-            "Work Visa",
-            "Employment Permit",
-          ],
-        },
-        {
-          value: "EDUCACIÓN / INVESTIGACIÓN",
-          aliases: [
-            "Education",
-            "Research",
-            "Education/Research",
-            "Study",
-            "Student Visa",
-          ],
-        },
-        {
-          value: "VIAJAR al",
-          aliases: ["Travel To", "Traveling To", "Travelling To", "To Travel"],
-        },
-      ],
-      "<<REGISTRAR>>": [
-        {
-          value: "Sub Registrador",
-          aliases: ["Sub Registrar", "Sub-Registrar"],
-        },
-        { value: "Local Registrador", aliases: ["Local Registrar"] },
-        {
-          value: "Registrador Local (EOMC)",
-          aliases: [
-            "Local Registrar (EOMC)",
-            "Registrar Local EOMC",
-            "EOMC Local Registrar",
-          ],
-        },
-      ],
-    } as const;
-
-    const aliasSet = aliases[placeholder as keyof typeof aliases] ?? [];
-    const aliasMatch = aliasSet.find(({ aliases: values }) =>
-      values.some((alias) => getDropdownLookupKey(alias) === normalized),
-    );
-    return aliasMatch ? aliasMatch.value : normalizeDateValue(trimmed);
-  }
-
   function applyBulkInput() {
-    const parsed = parseBulkPlaceholderValues(bulkInput);
     if (!bulkInput.trim()) {
-      setBulkResult("Paste placeholder values first.");
+      setBulkResult("Paste some placeholder values first.");
       setBulkResultType("error");
       return;
     }
 
-    const valid = Object.entries(parsed).filter(
-      ([placeholder]) => placeholder in formValues,
+    const parsed = parseBulkInput(bulkInput);
+    if (!Object.keys(parsed).length) {
+      setBulkResult(
+        "No placeholders found. Format: <<FIELD>> = value or {{FIELD}} = value",
+      );
+      setBulkResultType("error");
+      return;
+    }
+
+    // Match parsed tokens to loaded placeholders case-insensitively
+    let matched = 0;
+    const next = { ...formValues };
+    for (const [parsedToken, value] of Object.entries(parsed)) {
+      const loadedToken = placeholders.find(
+        (p) => p.token.toLowerCase() === parsedToken.toLowerCase(),
+      )?.token;
+      if (loadedToken !== undefined) {
+        next[loadedToken] = value;
+        matched++;
+      }
+    }
+
+    if (!matched) {
+      setBulkResult(
+        `None of the ${Object.keys(parsed).length} pasted placeholder(s) matched this document's placeholders.`,
+      );
+      setBulkResultType("error");
+      return;
+    }
+
+    setFormValues(next);
+    const skipped = Object.keys(parsed).length - matched;
+    setBulkResult(
+      `Filled ${matched} field${matched !== 1 ? "s" : ""}.${
+        skipped > 0 ? ` ${skipped} placeholder(s) not found in this document.` : ""
+      }`,
     );
-    if (!valid.length) {
-      setBulkResult("No matching placeholders found for this template.");
-      setBulkResultType("error");
-      return;
-    }
-
-    setFormValues((previous) => {
-      const next = { ...previous };
-      valid.forEach(([placeholder, value]) => {
-        if (!isAutomaticDatePlaceholder(placeholder)) {
-          next[placeholder] = normalizeDropdownValue(placeholder, value);
-        }
-      });
-      return next;
-    });
-
-    const ignoredCount = Object.keys(parsed).length - valid.length;
-    const ignored =
-      ignoredCount > 0
-        ? ` ${ignoredCount} placeholder(s) ignored because they are not in this template.`
-        : "";
-    setBulkResult(`Autofilled ${valid.length} field(s).${ignored}`);
     setBulkResultType("success");
     setActiveTab("fields");
   }
 
   function clearBulkInput() {
     setBulkInput("");
-    setBulkResult("Bulk box cleared.");
-    setBulkResultType("success");
+    setBulkResult("");
+    setBulkResultType("");
   }
 
   function handleFieldValueChange(token: string, value: string) {
-    const next = isAutomaticDatePlaceholder(token)
-      ? (formValues[token] ?? "")
-      : normalizeDateValue(value);
-    setFormValues((previous) => ({ ...previous, [token]: next }));
+    setFormValues((previous) => ({ ...previous, [token]: value }));
   }
 
   async function buildDocxBlob() {
-    if (!templateBuffer || !selectedKey) {
-      throw new Error("Choose a template first.");
+    if (!templateBuffer) {
+      throw new Error("Upload a document first.");
     }
 
     const zip = await JSZip.loadAsync(templateBuffer.slice(0));
-    const fileNames = Object.keys(zip.files).filter(
+    const xmlFileNames = Object.keys(zip.files).filter(
       (name) => name.startsWith("word/") && name.endsWith(".xml"),
     );
-    const replacements = {
-      ...formValues,
-      ...getAutomaticDateReplacements(),
-    };
 
-    for (const fileName of fileNames) {
+    // Only touch Word XML files — all binary media/font/image files in the
+    // archive are left untouched, preserving the original compression and
+    // byte-for-byte fidelity of every non-text asset.
+    for (const fileName of xmlFileNames) {
       const file = zip.file(fileName);
       if (!file) continue;
       const xml = await file.async("string");
-      zip.file(fileName, replaceXmlTokens(xml, replacements));
+      const replaced = replaceXmlTokens(xml, formValues);
+      // Preserve the file's original compression method
+      zip.file(fileName, replaced, { compression: "DEFLATE" });
     }
 
     return zip.generateAsync({
       type: "blob",
       mimeType: DOCX_MIME,
-      compression: "DEFLATE",
+      // Do not set a global compression — each file keeps its own setting.
+      // XML files were explicitly set to DEFLATE above; everything else
+      // (images, fonts, binary embeddings) keeps its original compression.
     });
   }
 
-  async function renderPreview(blob: Blob) {
+  async function renderHtmlPreview(blob: Blob) {
     const { renderAsync } = await import("docx-preview");
-    const wrapper = document.createElement("div");
 
-    await renderAsync(blob, wrapper, undefined, {
+    // Separate containers so docx-preview puts CSS in <head> and HTML in <body>
+    const bodyEl = document.createElement("div");
+    const styleEl = document.createElement("div");
+
+    await renderAsync(blob, bodyEl, styleEl, {
       className: "docx",
       inWrapper: true,
       ignoreWidth: false,
       ignoreHeight: false,
       breakPages: true,
-      useBase64URL: true,
+      ignoreLastRenderedPageBreak: false,
+      useBase64URL: false,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true,
+      experimental: false,
+      trimXmlDeclaration: true,
     });
 
-    setPreviewHtml(wrapper.innerHTML);
-    setPreviewVisible(true);
-    setPreviewBadge("Ready");
+    // Build a fully isolated standalone HTML document.
+    // Rendered inside an <iframe srcDoc> so Tailwind's preflight
+    // and global CSS never interfere with docx-preview's injected styles.
+    const standaloneDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+${styleEl.innerHTML}
+<style>
+html, body { margin: 0; padding: 0; background: #e8ebee; }
+</style>
+</head>
+<body>${bodyEl.innerHTML}</body>
+</html>`;
+
+    setPreviewHtml(standaloneDoc);
+  }
+
+  async function renderPreview(blob: Blob, sourceName?: string) {
+    const docxBuffer = await blob.arrayBuffer();
+
+    try {
+      const pdfBuffer = await requestWordPreviewPdf(
+        sourceName || customFileName || "preview.docx",
+        docxBuffer,
+      );
+      setPreviewPdfBuffer(pdfBuffer.slice(0));
+      setPreviewPdfVersion((v) => v + 1);
+      setPreviewHtml("");
+      return;
+    } catch {
+      setPreviewPdfBuffer(null);
+      setPreviewPdfVersion(0);
+    }
+
+    await renderHtmlPreview(blob);
+  }
+
+  async function handlePreviewUpdate() {
+    if (!templateBuffer) return;
+    setIsBusy(true);
+    applyStatus("Rendering filled preview…", "");
+    try {
+      const blob = await buildDocxBlob();
+      await renderPreview(blob, customFileName || "preview.docx");
+      applyStatus("Preview updated with your values.", "success");
+    } catch (error) {
+      applyStatus(
+        error instanceof Error ? error.message : "Preview failed.",
+        "error",
+      );
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function handleDocxDownload() {
@@ -347,11 +269,10 @@ export function useTemplateEditor() {
 
     try {
       const blob = await buildDocxBlob();
-      downloadBlob(blob, `${currentOutputName(selectedKey)}.docx`);
-      await renderPreview(blob);
-      applyStatus("MS Word file generated.", "success");
+      downloadBlob(blob, `${currentOutputName(customFileName)}.docx`);
+      await renderPreview(blob, customFileName || "preview.docx");
+      applyStatus("Word file generated.", "success");
     } catch (error) {
-      setPreviewBadge("Ready");
       applyStatus(
         error instanceof Error ? error.message : "Document generation failed.",
         "error",
@@ -363,48 +284,26 @@ export function useTemplateEditor() {
 
   async function handlePdfDownload() {
     setIsBusy(true);
-    applyStatus("Generating document...", "");
+    applyStatus("Generating PDF...", "");
 
     try {
       const blob = await buildDocxBlob();
-      await renderPreview(blob);
-      setPreviewBadge("Exporting");
+      const docxBuffer = await blob.arrayBuffer();
 
-      const html2pdfModule = (await import("html2pdf.js")) as unknown as {
-        default: () => {
-          set: (config: object) => {
-            from: (element: HTMLElement) => { save: () => Promise<void> };
-          };
-        };
-      };
+      // Use the same server-side conversion as the preview so the downloaded
+      // PDF is byte-for-byte identical to what the user sees in the preview.
+      const pdfBuffer = await requestWordPreviewPdf(
+        customFileName || "document.docx",
+        docxBuffer,
+      );
 
-      const exportNode = document.querySelector(
-        ".docx-wrapper",
-      ) as HTMLElement | null;
-      const target =
-        exportNode ??
-        (document.querySelector("#docPreview") as HTMLElement | null);
-      if (!target) {
-        throw new Error("Preview container not found.");
-      }
+      downloadBlob(
+        new Blob([pdfBuffer], { type: "application/pdf" }),
+        `${currentOutputName(customFileName)}.pdf`,
+      );
 
-      await html2pdfModule
-        .default()
-        .set({
-          filename: `${currentOutputName(selectedKey)}.pdf`,
-          margin: 0,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
-          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"] },
-        })
-        .from(target)
-        .save();
-
-      setPreviewBadge("Ready");
       applyStatus("PDF file generated.", "success");
     } catch (error) {
-      setPreviewBadge("Ready");
       applyStatus(
         error instanceof Error ? error.message : "Document generation failed.",
         "error",
@@ -415,44 +314,40 @@ export function useTemplateEditor() {
   }
 
   function clearFields() {
-    const defaults = getAutomaticDateReplacements();
     const next: FormValues = {};
-    placeholders.forEach(({ token }) => {
-      next[token] = isAutomaticDatePlaceholder(token) ? defaults[token] : "";
-    });
-
+    placeholders.forEach(({ token }) => { next[token] = ""; });
     setFormValues(next);
-    setPreviewVisible(false);
-    setPreviewHtml("");
+    setBulkInput("");
     setBulkResult("");
     setBulkResultType("");
     applyStatus("Fields cleared.", "success");
   }
 
   return {
-    selectedKey,
-    templateBuffer,
+    isUploaded,
+    customFileName,
     placeholders,
     formValues,
+    activeTab,
+    setActiveTab,
     bulkInput,
     setBulkInput,
     bulkResult,
     bulkResultType,
-    activeTab,
-    setActiveTab,
+    applyBulkInput,
+    clearBulkInput,
     status,
     statusType,
     previewHtml,
-    previewVisible,
-    previewBadge,
+    previewPdfBuffer,
+    previewPdfVersion,
     isBusy,
-    displayedPlaceholders,
-    handleTemplateChange,
-    applyBulkInput,
-    clearBulkInput,
+    handleCustomUpload,
+    handlePreviewUpdate,
     handleFieldValueChange,
     handleDocxDownload,
     handlePdfDownload,
     clearFields,
+    resetState,
   };
 }
