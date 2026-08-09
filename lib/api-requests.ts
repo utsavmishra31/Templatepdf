@@ -228,3 +228,41 @@ export async function requestPdfCompression(
       : buffer.byteLength,
   };
 }
+
+export type ImageConvertFormat = "png" | "jpg" | "jpeg" | "webp" | "avif";
+
+export async function requestImageConversion(
+  files: File[],
+  outputFormat: ImageConvertFormat,
+): Promise<{
+  buffer: ArrayBuffer;
+  contentType: string;
+  fileName: string;
+  outputKind: "single" | "zip";
+}> {
+  const formData = new FormData();
+  formData.set("format", outputFormat);
+
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch("/api/image-convert", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "Image conversion failed."),
+    );
+  }
+
+  return {
+    buffer: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+    fileName: response.headers.get("x-output-filename") || "converted-file",
+    outputKind:
+      response.headers.get("x-output-kind") === "zip" ? "zip" : "single",
+  };
+}

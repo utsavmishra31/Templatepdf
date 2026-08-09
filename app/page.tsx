@@ -216,6 +216,24 @@ const tools = [
     ),
   },
   {
+    href: "/image-convert",
+    title: "Convert Image Type",
+    description: "Convert images between PNG, JPG, JPEG, WEBP, and AVIF formats.",
+    badge: "Image Convert",
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-100",
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+        <path d="M14 7h6"/>
+        <path d="M17 4l3 3-3 3"/>
+      </svg>
+    ),
+  },
+  {
     href: "/rearrange-pdf",
     title: "Rearrange PDF Pages",
     description: "Drag and drop pages to reorder them, then download the new PDF.",
