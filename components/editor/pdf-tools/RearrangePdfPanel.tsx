@@ -136,13 +136,17 @@ export function RearrangePdfPanel({
 
                     <div className="group relative flex-1 overflow-hidden rounded">
                       <div className="flex items-center justify-center" style={{ minHeight: "100px" }}>
-                        <img
-                          src={page.previewSrc}
-                          alt={`Page ${index + 1}`}
-                          loading="lazy"
-                          className="h-auto w-full rounded border border-slate-100 bg-slate-50 transition-transform duration-200"
-                          style={{ transform: `rotate(${page.rotation}deg)` }}
-                        />
+                        {page.previewSrc ? (
+                          <img
+                            src={page.previewSrc}
+                            alt={`Page ${index + 1}`}
+                            loading="lazy"
+                            className="h-auto w-full rounded border border-slate-100 bg-slate-50 transition-transform duration-200"
+                            style={{ transform: `rotate(${page.rotation}deg)` }}
+                          />
+                        ) : (
+                          <div className="min-h-[180px] w-full rounded border border-slate-100 bg-slate-100 animate-pulse" />
+                        )}
                       </div>
                       <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-bold text-white">
                         {index + 1}

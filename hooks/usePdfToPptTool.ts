@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PPTX_MIME, requestPdfToPptConversion } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -45,10 +45,23 @@ export function usePdfToPptTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const previews = await renderPdfPagePreviews(buffer);
       setPdfToPptName(file.name);
       setPdfToPptBuffer(buffer);
-      setPdfToPptPreviews(previews);
+      setPdfToPptPreviews([]);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setPdfToPptPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsPdfToPptBusy(false);
+          }
+        },
+      });
+
       applyPdfToPptStatus(
         `${file.name} • ${previews.length} page(s). Click Convert to PPT to proceed.`,
         "success",

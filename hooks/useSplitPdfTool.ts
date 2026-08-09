@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME } from "@/lib/api-requests";
 import { autoDistributeSplitRanges, parseSplitRange } from "@/lib/format-utils";
@@ -42,9 +42,22 @@ export function useSplitPdfTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const previews = await renderPdfPagePreviews(buffer);
       setSplitPdfName(file.name);
       setSplitPdfBuffer(buffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setSplitPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsSplitPdfBusy(false);
+          }
+        },
+      });
+
       setSplitPdfPreviews(previews);
       setSplitRanges(
         autoDistributeSplitRanges(splitNumOutputs, previews.length),

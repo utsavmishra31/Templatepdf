@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews, renderSinglePdfPage } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews, renderSinglePdfPage } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -45,9 +45,22 @@ export function useRotatePdfTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const previews = await renderPdfPagePreviews(buffer);
       setRotatePdfName(file.name);
       setRotatePdfBuffer(buffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setRotatePdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsRotatePdfBusy(false);
+          }
+        },
+      });
+
       setRotatePdfPreviews(previews);
       applyRotatePdfStatus("", "");
     } catch (error) {
@@ -137,7 +150,13 @@ export function useRotatePdfTool() {
       const resultBuffer = bytes.buffer as ArrayBuffer;
       const baseName = rotatePdfName.replace(/\.pdf$/i, "") || "document";
       const outputName = `${baseName}-rotated.pdf`;
-      const updatedPreviews = await renderPdfPagePreviews(resultBuffer);
+      const updatedPreviews = await renderPdfPagePreviews(resultBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setRotatePdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+        },
+      });
       setRotatePdfBuffer(resultBuffer);
       setRotatePdfPreviews(updatedPreviews);
       setRotatePdfResultBuffer(resultBuffer);

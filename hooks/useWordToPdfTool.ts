@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { DOCX_MIME, PDF_MIME, requestWordPreviewPdf } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -45,12 +45,25 @@ export function useWordToPdfTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
-      const previews = await renderPdfPagePreviews(pdfBuffer);
-
       setWordToPdfName(file.name);
       setWordToPdfBuffer(buffer);
-      setWordToPdfPreviews(previews);
+      setWordToPdfPreviews([]);
+
+      const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setWordToPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsWordToPdfBusy(false);
+          }
+        },
+      });
+
       applyWordToPdfStatus(
         `${file.name} ready — ${previews.length} page(s). Click Convert to PDF.`,
         "success",
@@ -95,7 +108,13 @@ export function useWordToPdfTool() {
       );
       const baseName = wordToPdfName.replace(/\.docx$/i, "") || "document";
       const outputName = `${baseName}.pdf`;
-      const previews = await renderPdfPagePreviews(pdfBuffer);
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setWordToPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+        },
+      });
       setWordToPdfResultBuffer(pdfBuffer);
       setWordToPdfPreviews(previews);
       setWordToPdfResultName(outputName);

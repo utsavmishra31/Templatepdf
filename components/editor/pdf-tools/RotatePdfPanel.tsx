@@ -57,12 +57,16 @@ export function RotatePdfPanel({
                       Page {pageNumber}
                     </span>
                     <div className="group relative">
-                      <img
-                        src={previewSrc}
-                        alt={`Page ${pageNumber}`}
-                        loading="lazy"
-                        className="h-auto w-full rounded-md bg-slate-50"
-                      />
+                      {previewSrc ? (
+                        <img
+                          src={previewSrc}
+                          alt={`Page ${pageNumber}`}
+                          loading="lazy"
+                          className="h-auto w-full rounded-md bg-slate-50"
+                        />
+                      ) : (
+                        <div className="min-h-[240px] rounded-md bg-slate-100 animate-pulse" />
+                      )}
                       <div className="absolute inset-0 flex items-center justify-center gap-3 rounded-md bg-black/0 transition group-hover:bg-black/20">
                         <button
                           type="button"

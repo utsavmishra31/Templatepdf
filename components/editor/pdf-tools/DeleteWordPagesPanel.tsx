@@ -71,12 +71,16 @@ export function DeleteWordPagesPanel({
                     <span className="text-sm font-bold text-slate-800">
                       Page {pageNumber}
                     </span>
-                    <img
-                      src={previewSrc}
-                      alt={`Word page ${pageNumber}`}
-                      loading="lazy"
-                      className="h-auto w-full rounded-md bg-slate-50"
-                    />
+                    {previewSrc ? (
+                      <img
+                        src={previewSrc}
+                        alt={`Word page ${pageNumber}`}
+                        loading="lazy"
+                        className="h-auto w-full rounded-md bg-slate-50"
+                      />
+                    ) : (
+                      <div className="min-h-[240px] rounded-md bg-slate-100 animate-pulse" />
+                    )}
                   </label>
                 );
               })}

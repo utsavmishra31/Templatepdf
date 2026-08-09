@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import {
   DOCX_MIME,
@@ -122,16 +122,30 @@ export function useWordDeleteTool() {
 
     try {
       const buffer = await file.arrayBuffer();
+      setUploadedWordName(file.name);
+      setUploadedWordBuffer(buffer);
+      setUploadedWordPreviews([]);
+
       const pdfBuffer = await requestWordPreviewPdf(file.name, buffer);
-      const previews = await renderPdfPagePreviews(pdfBuffer);
+      setWorkingPdfBuffer(pdfBuffer);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(pdfBuffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setUploadedWordPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsWordBusy(false);
+          }
+        },
+      });
 
       if (!previews.length) {
         throw new Error("The uploaded Word file has no previewable pages.");
       }
 
-      setUploadedWordName(file.name);
-      setUploadedWordBuffer(buffer);
-      setWorkingPdfBuffer(pdfBuffer);
       setUploadedWordPreviews(previews);
       setSelectedWordPages([]);
       setWordPageRangeInput("");
@@ -237,7 +251,13 @@ export function useWordDeleteTool() {
         workingPdfBuffer,
         selectedWordPages,
       );
-      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer);
+      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer, undefined, {
+        onUpdate: (partialPreviews, update) => {
+          setUploadedWordPreviews((prev) =>
+            mergePreviewSlots(prev, partialPreviews, update.total),
+          );
+        },
+      });
 
       setWorkingPdfBuffer(result.nextBuffer);
       setUploadedWordPreviews(nextPreviews);

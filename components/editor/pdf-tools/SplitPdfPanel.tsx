@@ -58,12 +58,16 @@ export function SplitPdfPanel({
                     <span className="text-xs font-bold text-slate-500">
                       Page {index + 1}
                     </span>
-                    <img
-                      src={previewSrc}
-                      alt={`Page ${index + 1}`}
-                      loading="lazy"
-                      className="h-auto w-full rounded bg-slate-50"
-                    />
+                    {previewSrc ? (
+                      <img
+                        src={previewSrc}
+                        alt={`Page ${index + 1}`}
+                        loading="lazy"
+                        className="h-auto w-full rounded bg-slate-50"
+                      />
+                    ) : (
+                      <div className="min-h-[170px] rounded bg-slate-100 animate-pulse" />
+                    )}
                   </div>
                 ))}
               </div>

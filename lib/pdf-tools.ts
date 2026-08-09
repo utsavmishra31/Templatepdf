@@ -19,6 +19,30 @@ type PdfJsModule = {
   getDocument: (source: { data: ArrayBuffer }) => { promise: Promise<PdfJsDocumentProxy> };
 };
 
+type PreviewRenderUpdate = {
+  rendered: number;
+  total: number;
+  done: boolean;
+};
+
+type PreviewRenderOptions = {
+  initialPageCount?: number;
+  chunkSize?: number;
+  onUpdate?: (previews: string[], update: PreviewRenderUpdate) => void;
+};
+
+export function mergePreviewSlots(
+  current: string[],
+  partial: string[],
+  total: number,
+): string[] {
+  const next = current.length === total ? [...current] : Array(total).fill("");
+  for (let i = 0; i < partial.length; i += 1) {
+    next[i] = partial[i] ?? "";
+  }
+  return next;
+}
+
 async function renderOnePage(pdf: PdfJsDocumentProxy, pageNumber: number): Promise<string> {
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale: 1.5 });
@@ -41,7 +65,18 @@ export async function renderSinglePdfPage(
   return renderOnePage(pdf, pageNumber);
 }
 
-export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer, maxPages?: number): Promise<string[]> {
+export async function getPdfPageCount(sourceBuffer: ArrayBuffer): Promise<number> {
+  const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+  const pdf = await pdfjs.getDocument({ data: sourceBuffer.slice(0) }).promise;
+  return pdf.numPages;
+}
+
+export async function renderPdfPagePreviews(
+  sourceBuffer: ArrayBuffer,
+  maxPages?: number,
+  options?: PreviewRenderOptions,
+): Promise<string[]> {
   const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJsModule;
   pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -49,9 +84,25 @@ export async function renderPdfPagePreviews(sourceBuffer: ArrayBuffer, maxPages?
   const pdf = await loadingTask.promise;
   const previews: string[] = [];
   const limit = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
+  const initialPageCount = Math.max(1, options?.initialPageCount ?? 3);
+  const chunkSize = Math.max(1, options?.chunkSize ?? 2);
 
   for (let pageNumber = 1; pageNumber <= limit; pageNumber += 1) {
     previews.push(await renderOnePage(pdf, pageNumber));
+
+    const rendered = previews.length;
+    const done = rendered === limit;
+    const shouldEmitFirst = rendered === 1;
+    const shouldEmitInitial = rendered === initialPageCount;
+    const shouldEmitChunk = rendered > initialPageCount && ((rendered - initialPageCount) % chunkSize === 0);
+
+    if (options?.onUpdate && (shouldEmitFirst || shouldEmitInitial || shouldEmitChunk || done)) {
+      options.onUpdate([...previews], {
+        rendered,
+        total: limit,
+        done,
+      });
+    }
   }
 
   return previews;

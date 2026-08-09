@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useState } from "react";
-import { renderPdfPagePreviews } from "@/lib/pdf-tools";
+import { mergePreviewSlots, renderPdfPagePreviews } from "@/lib/pdf-tools";
 import { downloadBlob } from "@/lib/template";
 import { PDF_MIME, requestPdfPageDeletion } from "@/lib/api-requests";
 import type { StatusType } from "@/types/editor";
@@ -113,14 +113,27 @@ export function usePdfDeleteTool() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const previews = await renderPdfPagePreviews(buffer);
+      setUploadedPdfName(file.name);
+      setUploadedPdfBuffer(buffer);
+      setUploadedPdfPreviews([]);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setUploadedPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsPdfBusy(false);
+          }
+        },
+      });
 
       if (!previews.length) {
         throw new Error("The uploaded PDF has no pages.");
       }
 
-      setUploadedPdfName(file.name);
-      setUploadedPdfBuffer(buffer);
       setUploadedPdfPreviews(previews);
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
@@ -220,7 +233,13 @@ export function usePdfDeleteTool() {
         uploadedPdfBuffer,
         selectedPdfPages,
       );
-      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer);
+      const nextPreviews = await renderPdfPagePreviews(result.nextBuffer, undefined, {
+        onUpdate: (partialPreviews, update) => {
+          setUploadedPdfPreviews((prev) =>
+            mergePreviewSlots(prev, partialPreviews, update.total),
+          );
+        },
+      });
       const baseName = uploadedPdfName.replace(/\.pdf$/i, "") || "edited";
       const outputName = `${baseName}-updated.pdf`;
 
@@ -256,10 +275,24 @@ export function usePdfDeleteTool() {
     setIsPdfBusy(true);
     applyPdfStatus("Loading PDF…", "");
     try {
-      const previews = await renderPdfPagePreviews(buffer);
-      if (!previews.length) throw new Error("The PDF has no pages.");
       setUploadedPdfName(name);
       setUploadedPdfBuffer(buffer);
+      setUploadedPdfPreviews([]);
+
+      let unlocked = false;
+      const previews = await renderPdfPagePreviews(buffer, undefined, {
+        onUpdate: (nextPreviews, update) => {
+          setUploadedPdfPreviews((prev) =>
+            mergePreviewSlots(prev, nextPreviews, update.total),
+          );
+          if (!unlocked && nextPreviews.length > 0) {
+            unlocked = true;
+            setIsPdfBusy(false);
+          }
+        },
+      });
+
+      if (!previews.length) throw new Error("The PDF has no pages.");
       setUploadedPdfPreviews(previews);
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
