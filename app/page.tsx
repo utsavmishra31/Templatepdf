@@ -251,6 +251,21 @@ const tools = [
     ),
   },
   {
+    href: "/scan-to-pdf",
+    title: "Scan Photo to PDF",
+    description: "Use mobile front/back camera or laptop webcam to capture photos and create a scanned PDF.",
+    badge: "Scanner",
+    badgeColor: "bg-cyan-50 text-cyan-700 border-cyan-100",
+    iconBg: "bg-cyan-50",
+    iconColor: "text-cyan-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    ),
+  },
+  {
     href: "/rearrange-pdf",
     title: "Rearrange PDF Pages",
     description: "Drag and drop pages to reorder them, then download the new PDF.",
