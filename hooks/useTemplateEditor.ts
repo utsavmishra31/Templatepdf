@@ -271,7 +271,7 @@ html, body { margin: 0; padding: 0; background: #e8ebee; }
       const blob = await buildDocxBlob();
       downloadBlob(blob, `${currentOutputName(customFileName)}.docx`);
       await renderPreview(blob, customFileName || "preview.docx");
-      applyStatus("MS Word file generated.", "success");
+      applyStatus("Word file generated.", "success");
     } catch (error) {
       applyStatus(
         error instanceof Error ? error.message : "Document generation failed.",

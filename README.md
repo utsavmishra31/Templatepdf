@@ -16,7 +16,7 @@ Supported templates:
 - Bulk Paste tab for entries like `<<NAME>> = UTSAV MISHRA, <<CERT_NO>> = CD1234567654`
 - Empty text fields for each `<<PLACEHOLDER>>`
 - Dropdown plus custom text controls for common PCC/Medical values such as title, relation, and PCC type
-- MS Word download with placeholders replaced by typed text
+- Word download with placeholders replaced by typed text
 - PDF download generated in the browser from the rendered document preview
 
 ## Project Structure

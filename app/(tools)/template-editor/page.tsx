@@ -265,7 +265,7 @@ export default function TemplateEditorPage() {
             onClick={editor.handleDocxDownload}
             disabled={editor.isBusy}
           >
-            Download MS Word
+            Download Word
           </button>
           <div className="flex gap-2">
             <button
