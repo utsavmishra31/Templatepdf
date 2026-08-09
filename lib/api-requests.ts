@@ -266,3 +266,65 @@ export async function requestImageConversion(
       response.headers.get("x-output-kind") === "zip" ? "zip" : "single",
   };
 }
+
+export type ImageResizeMode = "ratio" | "pixel" | "percentage";
+
+export type ImageResizeOptions =
+  | {
+      mode: "ratio";
+      ratioNumerator: number;
+      ratioDenominator: number;
+    }
+  | {
+      mode: "pixel";
+      width: number;
+      height: number;
+    }
+  | {
+      mode: "percentage";
+      percentage: number;
+    };
+
+export async function requestImageResize(
+  files: File[],
+  options: ImageResizeOptions,
+): Promise<{
+  buffer: ArrayBuffer;
+  contentType: string;
+  fileName: string;
+  outputKind: "single" | "zip";
+}> {
+  const formData = new FormData();
+  formData.set("mode", options.mode);
+
+  if (options.mode === "ratio") {
+    formData.set("ratioNumerator", String(options.ratioNumerator));
+    formData.set("ratioDenominator", String(options.ratioDenominator));
+  } else if (options.mode === "pixel") {
+    formData.set("width", String(options.width));
+    formData.set("height", String(options.height));
+  } else {
+    formData.set("percentage", String(options.percentage));
+  }
+
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch("/api/image-resize", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Image resize failed."));
+  }
+
+  return {
+    buffer: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+    fileName: response.headers.get("x-output-filename") || "resized-file",
+    outputKind:
+      response.headers.get("x-output-kind") === "zip" ? "zip" : "single",
+  };
+}
