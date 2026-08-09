@@ -84,6 +84,22 @@ const tools = [
     ),
   },
   {
+    href: "/pdf-to-ppt",
+    title: "PDF to PPT",
+    description: "Convert a PDF document into an editable PowerPoint presentation.",
+    badge: "PDF → PPT",
+    badgeColor: "bg-cyan-50 text-cyan-700 border-cyan-100",
+    iconBg: "bg-cyan-50",
+    iconColor: "text-cyan-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 12h16"/>
+        <path d="M14 5l7 7-7 7"/>
+        <rect x="3" y="4" width="7" height="6" rx="1"/>
+      </svg>
+    ),
+  },
+  {
     href: "/merge-pdf",
     title: "Merge PDFs",
     description: "Combine multiple PDF files into one. Drag to reorder before merging.",

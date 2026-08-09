@@ -1,6 +1,8 @@
 export const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const PDF_MIME = "application/pdf";
+export const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 export async function getApiErrorMessage(
   response: Response,
@@ -135,6 +137,30 @@ export async function requestPdfToWordConversion(
   if (!response.ok) {
     throw new Error(
       await getApiErrorMessage(response, "PDF to Word conversion failed."),
+    );
+  }
+
+  return response.arrayBuffer();
+}
+
+export async function requestPdfToPptConversion(
+  fileName: string,
+  sourceBuffer: ArrayBuffer,
+): Promise<ArrayBuffer> {
+  const formData = new FormData();
+  formData.set(
+    "file",
+    new File([sourceBuffer.slice(0)], fileName, { type: "application/pdf" }),
+  );
+
+  const response = await fetch("/api/pdf-to-ppt", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "PDF to PPT conversion failed."),
     );
   }
 
