@@ -148,12 +148,18 @@ export function JpgToPdfPanel({
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.effectAllowed = "move";
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      e.dataTransfer.setDragImage(
+                        e.currentTarget as HTMLElement,
+                        e.clientX - rect.left,
+                        e.clientY - rect.top,
+                      );
                       setDragSrc(index);
                     }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "move";
-                      setDragOver(index);
+                      if (dragOver !== index) setDragOver(index);
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -166,12 +172,15 @@ export function JpgToPdfPanel({
                       setDragSrc(null);
                       setDragOver(null);
                     }}
-                    onDragLeave={() => setDragOver(null)}
-                    className={`flex h-[220px] cursor-grab select-none flex-col rounded-lg border-2 bg-white p-2 active:cursor-grabbing ${
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node))
+                        setDragOver(null);
+                    }}
+                    className={`flex h-[220px] cursor-grab select-none flex-col rounded-lg border-2 bg-white p-2 transition-all duration-150 active:cursor-grabbing ${
                       dragSrc === index
-                        ? "border-slate-300 opacity-40"
+                        ? "border-slate-300 opacity-30 scale-95"
                         : dragOver === index
-                          ? "border-teal-500 bg-teal-50"
+                          ? "border-teal-500 bg-teal-50 scale-[1.02]"
                           : "border-slate-200"
                     }`}
                     role="listitem"
