@@ -3,7 +3,7 @@ import Link from "next/link";
 const tools = [
   {
     href: "/template-editor",
-    title: "Template Editor",
+    title: "Word Template Editor",
     description: "Fill in placeholders and download your document as Word or PDF.",
     badge: "Word & PDF",
     badgeColor: "bg-teal-50 text-teal-700 border-teal-100",
