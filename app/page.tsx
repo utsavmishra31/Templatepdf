@@ -166,6 +166,23 @@ const tools = [
     ),
   },
   {
+    href: "/crop-pdf",
+    title: "Crop PDF",
+    description: "Crop each page with per-page controls, then download the updated PDF.",
+    badge: "Crop",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M8 8h8v8H8z"/>
+        <path d="M3 12h3"/>
+        <path d="M18 12h3"/>
+      </svg>
+    ),
+  },
+  {
     href: "/split-pdf",
     title: "Split PDF",
     description: "Split one PDF into multiple files by defining custom page ranges.",
