@@ -230,4 +230,39 @@ export async function convertPdfToPptx(sourceBuffer: ArrayBuffer | Uint8Array): 
   });
 }
 
+/**
+ * Convert a PPT/PPTX file to PDF using LibreOffice Impress export.
+ */
+export async function convertPptToPdf(sourceBuffer: ArrayBuffer | Uint8Array): Promise<Buffer> {
+  return withTempDir(async (directory) => {
+    const inputPath = join(directory, "input.pptx");
+    const outputDir = join(directory, "output");
+    const profilePath = join(directory, "lo-profile");
+
+    await writeFile(inputPath, toBuffer(sourceBuffer));
+    await mkdir(outputDir, { recursive: true });
+
+    await execFileAsync(
+      "soffice",
+      [
+        "--headless",
+        `-env:UserInstallation=${pathToFileURL(profilePath).toString()}`,
+        "--convert-to",
+        "pdf:impress_pdf_Export",
+        "--outdir",
+        outputDir,
+        inputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 120_000,
+      },
+    );
+
+    const outputPath = join(outputDir, "input.pdf");
+    return readFile(outputPath);
+  });
+}
+
 export { DOCX_MIME, PPTX_MIME };

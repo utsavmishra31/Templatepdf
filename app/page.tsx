@@ -69,6 +69,22 @@ const tools = [
     ),
   },
   {
+    href: "/ppt-to-pdf",
+    title: "PPT to PDF",
+    description: "Convert a PPT or PPTX presentation into a PDF file.",
+    badge: "PPT → PDF",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12h14"/>
+        <path d="M12 5l7 7-7 7"/>
+        <circle cx="8" cy="8" r="2"/>
+      </svg>
+    ),
+  },
+  {
     href: "/pdf-to-word",
     title: "PDF to Word",
     description: "Convert a PDF document into an editable DOCX file.",
