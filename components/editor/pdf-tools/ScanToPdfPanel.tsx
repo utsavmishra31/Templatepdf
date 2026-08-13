@@ -83,7 +83,7 @@ export function ScanToPdfPanel({
     <section className="md:-mt-8" aria-labelledby="scanToPdfTitle">
       <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
         <div
-          className="order-2 max-h-[calc(100dvh-3.5rem)] overflow-y-auto pt-4 pl-4 pr-2 md:order-1"
+          className="order-2 px-1 pt-2 md:order-1 md:max-h-[calc(100dvh-3.5rem)] md:overflow-y-auto md:pt-4 md:pl-4 md:pr-2"
           aria-label="Captured scan pages"
         >
           {isCameraOn && (
@@ -100,11 +100,42 @@ export function ScanToPdfPanel({
                   muted
                 />
               </div>
+
+              <div className="mt-3 grid gap-2 md:hidden">
+                <button
+                  type="button"
+                  className="min-h-10 rounded-lg border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white disabled:opacity-60"
+                  onClick={onCapture}
+                  disabled={isBusy || !isCameraOn}
+                >
+                  Capture Page
+                </button>
+
+                {hasDualCameraOptions && (
+                  <button
+                    type="button"
+                    className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                    onClick={onSwitchCamera}
+                    disabled={isBusy}
+                  >
+                    Switch Camera ({facingMode === "environment" ? "Back" : "Front"})
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                  onClick={onStopCamera}
+                  disabled={isBusy}
+                >
+                  Stop Camera
+                </button>
+              </div>
             </div>
           )}
 
           {pages.length > 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
               {pages.map((page, index) => (
                 <article
                   key={page.id}
@@ -165,7 +196,7 @@ export function ScanToPdfPanel({
           )}
         </div>
 
-        <div className="order-1 flex h-full min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col rounded-none border-y-0 border-l border-r-0 border-slate-200 bg-white p-4 shadow-none md:sticky md:top-14 md:order-2 md:w-[360px] md:self-stretch md:justify-self-end">
+        <div className="order-1 flex min-h-0 min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:sticky md:top-14 md:order-2 md:h-full md:min-h-[calc(100dvh-3.5rem)] md:w-[360px] md:self-stretch md:justify-self-end md:rounded-none md:border-y-0 md:border-l md:border-r-0 md:p-4 md:shadow-none">
           <div className="border-b border-slate-200 pb-3">
             <p className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-teal-800">
               Camera Scan
@@ -185,7 +216,7 @@ export function ScanToPdfPanel({
           <div className="mt-3 border-t border-slate-200 pt-3">
             <button
               type="button"
-              className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={handleToggleSelectAll}
               disabled={isBusy || pages.length === 0}
             >
@@ -207,10 +238,10 @@ export function ScanToPdfPanel({
             </select>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
+          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2">
             <button
               type="button"
-              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={() => onRotateSelected("ccw")}
               disabled={isBusy || selectedPageIds.length === 0}
             >
@@ -218,7 +249,7 @@ export function ScanToPdfPanel({
             </button>
             <button
               type="button"
-              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={() => onRotateSelected("cw")}
               disabled={isBusy || selectedPageIds.length === 0}
             >
@@ -226,7 +257,7 @@ export function ScanToPdfPanel({
             </button>
             <button
               type="button"
-              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={() => onFlipSelected("horizontal")}
               disabled={isBusy || selectedPageIds.length === 0}
             >
@@ -234,7 +265,7 @@ export function ScanToPdfPanel({
             </button>
             <button
               type="button"
-              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={() => onFlipSelected("vertical")}
               disabled={isBusy || selectedPageIds.length === 0}
             >
@@ -243,7 +274,7 @@ export function ScanToPdfPanel({
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-200 pt-3">
-            <label className="relative inline-flex min-h-9 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
+            <label className="relative inline-flex min-h-10 md:min-h-9 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
               <input
                 type="file"
                 accept="image/*"
@@ -261,7 +292,7 @@ export function ScanToPdfPanel({
                 {!isCameraOn && (
                   <button
                     type="button"
-                    className="min-h-9 w-full rounded-lg border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800"
+                    className="min-h-10 md:min-h-9 w-full rounded-lg border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800"
                     onClick={onStartCamera}
                     disabled={isBusy}
                   >
@@ -271,7 +302,7 @@ export function ScanToPdfPanel({
                 {hasDualCameraOptions && (
                   <button
                     type="button"
-                    className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                    className="hidden min-h-10 md:inline-flex md:min-h-9 md:w-full md:items-center md:justify-center md:rounded-lg md:border md:border-slate-300 md:bg-white md:px-3 md:text-sm md:font-semibold md:text-slate-700"
                     onClick={onSwitchCamera}
                     disabled={isBusy}
                   >
@@ -280,7 +311,7 @@ export function ScanToPdfPanel({
                 )}
                 <button
                   type="button"
-                  className="min-h-9 w-full rounded-lg border border-teal-700 bg-teal-700 px-3 text-sm font-semibold text-white disabled:opacity-60"
+                  className="hidden min-h-10 md:inline-flex md:min-h-9 md:w-full md:items-center md:justify-center md:rounded-lg md:border md:border-teal-700 md:bg-teal-700 md:px-3 md:text-sm md:font-semibold md:text-white md:disabled:opacity-60"
                   onClick={onCapture}
                   disabled={isBusy || !isCameraOn}
                 >
@@ -289,7 +320,7 @@ export function ScanToPdfPanel({
                 {isCameraOn && (
                   <button
                     type="button"
-                    className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                    className="hidden min-h-10 md:inline-flex md:min-h-9 md:w-full md:items-center md:justify-center md:rounded-lg md:border md:border-slate-300 md:bg-white md:px-3 md:text-sm md:font-semibold md:text-slate-700"
                     onClick={onStopCamera}
                     disabled={isBusy}
                   >
@@ -307,7 +338,7 @@ export function ScanToPdfPanel({
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-200 pt-3">
             <button
               type="button"
-              className={`min-h-9 w-full rounded-lg border px-3 text-sm font-semibold ${
+              className={`min-h-10 md:min-h-9 w-full rounded-lg border px-3 text-sm font-semibold ${
                 pages.length > 0
                   ? "border-teal-700 bg-white text-teal-800"
                   : "border-slate-300 bg-slate-100 text-slate-400"
@@ -320,7 +351,7 @@ export function ScanToPdfPanel({
 
             <button
               type="button"
-              className={`min-h-9 w-full rounded-lg border px-3 text-sm font-semibold transition ${
+              className={`min-h-10 md:min-h-9 w-full rounded-lg border px-3 text-sm font-semibold transition ${
                 resultBuffer
                   ? "border-transparent bg-teal-700 text-white hover:bg-teal-800"
                   : "border-slate-300 bg-slate-100 text-slate-400"
@@ -333,7 +364,7 @@ export function ScanToPdfPanel({
 
             <button
               type="button"
-              className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+              className="min-h-10 md:min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
               onClick={onClearAll}
               disabled={isBusy || pages.length === 0}
             >

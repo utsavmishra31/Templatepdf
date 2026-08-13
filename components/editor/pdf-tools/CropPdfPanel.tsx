@@ -1,4 +1,11 @@
-import { useMemo, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import type { StatusType } from "@/types/editor";
 
 type CropRect = {
@@ -109,9 +116,25 @@ export function CropPdfPanel({
   const [dragMode, setDragMode] = useState<DragMode | null>(null);
   const [draftRect, setDraftRect] = useState<CropRect | null>(null);
 
+  useEffect(() => {
+    if (!dragMode) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
+    };
+  }, [dragMode]);
+
   const hasAnyCrop = cropPageSettings.some(
     (settings) => settings.x > 0 || settings.y > 0 || settings.width < 100 || settings.height < 100,
   );
+  const useHorizontalPagePickerOnMobile = cropPdfPreviews.length > 2;
 
   const selectedPreview = useMemo(() => {
     if (selectedCropPage < 1) return "";
@@ -120,14 +143,28 @@ export function CropPdfPanel({
 
   const shownRect = draftRect ?? selectedPageRect;
 
-  function getPercentPoint(event: ReactMouseEvent, container: HTMLDivElement): { x: number; y: number } {
+  function getPercentPointFromClient(
+    clientX: number,
+    clientY: number,
+    container: HTMLDivElement,
+  ): { x: number; y: number } {
     const bounds = container.getBoundingClientRect();
-    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
-    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    const x = ((clientX - bounds.left) / bounds.width) * 100;
+    const y = ((clientY - bounds.top) / bounds.height) * 100;
     return {
       x: clampPercent(x),
       y: clampPercent(y),
     };
+  }
+
+  function getPercentPoint(event: ReactMouseEvent, container: HTMLDivElement): { x: number; y: number } {
+    return getPercentPointFromClient(event.clientX, event.clientY, container);
+  }
+
+  function getTouchPoint(event: ReactTouchEvent<HTMLDivElement>): { x: number; y: number } | null {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return null;
+    return getPercentPointFromClient(touch.clientX, touch.clientY, event.currentTarget);
   }
 
   function handleCropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
@@ -138,9 +175,64 @@ export function CropPdfPanel({
     setDraftRect({ x: point.x, y: point.y, width: MIN_RECT_PERCENT, height: MIN_RECT_PERCENT });
   }
 
+  function handleCropTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
+    if (isCropPdfBusy || isBusy) return;
+    const point = getTouchPoint(event);
+    if (!point) return;
+    event.preventDefault();
+    setDragMode({ type: "draw", start: point });
+    setDraftRect({ x: point.x, y: point.y, width: MIN_RECT_PERCENT, height: MIN_RECT_PERCENT });
+  }
+
   function handleCropMouseMove(event: ReactMouseEvent<HTMLDivElement>) {
     if (!dragMode) return;
     const point = getPercentPoint(event, event.currentTarget);
+
+    if (dragMode.type === "draw") {
+      const next = normalizeRect({
+        x: Math.min(dragMode.start.x, point.x),
+        y: Math.min(dragMode.start.y, point.y),
+        width: Math.abs(point.x - dragMode.start.x),
+        height: Math.abs(point.y - dragMode.start.y),
+      });
+      setDraftRect(next);
+      return;
+    }
+
+    if (dragMode.type === "move") {
+      const dx = point.x - dragMode.start.x;
+      const dy = point.y - dragMode.start.y;
+      const nextX = clamp(dragMode.startRect.x + dx, 0, 100 - dragMode.startRect.width);
+      const nextY = clamp(dragMode.startRect.y + dy, 0, 100 - dragMode.startRect.height);
+      setDraftRect({
+        x: nextX,
+        y: nextY,
+        width: dragMode.startRect.width,
+        height: dragMode.startRect.height,
+      });
+      return;
+    }
+
+    const dx = point.x - dragMode.start.x;
+    const dy = point.y - dragMode.start.y;
+    let left = dragMode.startRect.x;
+    let top = dragMode.startRect.y;
+    let right = dragMode.startRect.x + dragMode.startRect.width;
+    let bottom = dragMode.startRect.y + dragMode.startRect.height;
+
+    if (dragMode.handle.includes("w")) left += dx;
+    if (dragMode.handle.includes("e")) right += dx;
+    if (dragMode.handle.includes("n")) top += dy;
+    if (dragMode.handle.includes("s")) bottom += dy;
+
+    setDraftRect(getRectFromEdges(left, top, right, bottom));
+  }
+
+  function handleCropTouchMove(event: ReactTouchEvent<HTMLDivElement>) {
+    if (!dragMode) return;
+    const point = getTouchPoint(event);
+    if (!point) return;
+    event.preventDefault();
 
     if (dragMode.type === "draw") {
       const next = normalizeRect({
@@ -190,12 +282,28 @@ export function CropPdfPanel({
     setDraftRect(null);
   }
 
+  function handleCropTouchEnd() {
+    handleCropMouseUp();
+  }
+
   function handleMoveBoxMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
     if (isCropPdfBusy || isBusy) return;
     event.preventDefault();
     event.stopPropagation();
     const container = event.currentTarget.parentElement?.parentElement as HTMLDivElement;
     const point = getPercentPoint(event, container);
+    setDragMode({ type: "move", start: point, startRect: shownRect });
+    setDraftRect(shownRect);
+  }
+
+  function handleMoveBoxTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
+    if (isCropPdfBusy || isBusy) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const container = event.currentTarget.parentElement?.parentElement as HTMLDivElement;
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    const point = getPercentPointFromClient(touch.clientX, touch.clientY, container);
     setDragMode({ type: "move", start: point, startRect: shownRect });
     setDraftRect(shownRect);
   }
@@ -210,11 +318,23 @@ export function CropPdfPanel({
     setDraftRect(shownRect);
   }
 
+  function handleResizeTouchStart(handle: ResizeHandle, event: ReactTouchEvent<HTMLDivElement>) {
+    if (isCropPdfBusy || isBusy) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const container = event.currentTarget.parentElement?.parentElement as HTMLDivElement;
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    const point = getPercentPointFromClient(touch.clientX, touch.clientY, container);
+    setDragMode({ type: "resize", handle, start: point, startRect: shownRect });
+    setDraftRect(shownRect);
+  }
+
   return (
     <section className="md:-mt-8" aria-labelledby="cropPdfTitle">
       <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
         <div
-          className="order-2 max-h-[calc(100dvh-3.5rem)] overflow-y-auto pt-4 pl-4 pr-2 md:order-1"
+          className="order-2 px-1 pt-2 md:order-1 md:max-h-[calc(100dvh-3.5rem)] md:overflow-y-auto md:pt-4 md:pl-4 md:pr-2"
           role="list"
           aria-label="PDF pages to crop"
         >
@@ -229,7 +349,11 @@ export function CropPdfPanel({
                   onMouseMove={handleCropMouseMove}
                   onMouseUp={handleCropMouseUp}
                   onMouseLeave={handleCropMouseUp}
-                  className="relative mx-auto w-full max-w-[760px] cursor-crosshair select-none overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                  onTouchStart={handleCropTouchStart}
+                  onTouchMove={handleCropTouchMove}
+                  onTouchEnd={handleCropTouchEnd}
+                  onTouchCancel={handleCropTouchEnd}
+                  className="relative mx-auto w-full max-w-[760px] touch-none cursor-crosshair select-none overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
                 >
                   {selectedPreview ? (
                     <img
@@ -252,22 +376,29 @@ export function CropPdfPanel({
                   >
                     <div
                       onMouseDown={handleMoveBoxMouseDown}
-                      className="h-full w-full cursor-move"
+                      onTouchStart={handleMoveBoxTouchStart}
+                      className="h-full w-full touch-none cursor-move"
                     />
 
-                    <div className="absolute -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("nw", event)} />
-                    <div className="absolute left-1/2 -top-1.5 h-3 w-3 -translate-x-1/2 cursor-ns-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("n", event)} />
-                    <div className="absolute -right-1.5 -top-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("ne", event)} />
-                    <div className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("e", event)} />
-                    <div className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("se", event)} />
-                    <div className="absolute left-1/2 -bottom-1.5 h-3 w-3 -translate-x-1/2 cursor-ns-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("s", event)} />
-                    <div className="absolute -left-1.5 -bottom-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("sw", event)} />
-                    <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("w", event)} />
+                    <div className="absolute -left-1.5 -top-1.5 h-3 w-3 touch-none cursor-nwse-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("nw", event)} onTouchStart={(event) => handleResizeTouchStart("nw", event)} />
+                    <div className="absolute left-1/2 -top-1.5 h-3 w-3 -translate-x-1/2 touch-none cursor-ns-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("n", event)} onTouchStart={(event) => handleResizeTouchStart("n", event)} />
+                    <div className="absolute -right-1.5 -top-1.5 h-3 w-3 touch-none cursor-nesw-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("ne", event)} onTouchStart={(event) => handleResizeTouchStart("ne", event)} />
+                    <div className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 touch-none cursor-ew-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("e", event)} onTouchStart={(event) => handleResizeTouchStart("e", event)} />
+                    <div className="absolute -right-1.5 -bottom-1.5 h-3 w-3 touch-none cursor-nwse-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("se", event)} onTouchStart={(event) => handleResizeTouchStart("se", event)} />
+                    <div className="absolute left-1/2 -bottom-1.5 h-3 w-3 -translate-x-1/2 touch-none cursor-ns-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("s", event)} onTouchStart={(event) => handleResizeTouchStart("s", event)} />
+                    <div className="absolute -left-1.5 -bottom-1.5 h-3 w-3 touch-none cursor-nesw-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("sw", event)} onTouchStart={(event) => handleResizeTouchStart("sw", event)} />
+                    <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 touch-none cursor-ew-resize rounded-full border border-teal-700 bg-white" onMouseDown={(event) => handleResizeMouseDown("w", event)} onTouchStart={(event) => handleResizeTouchStart("w", event)} />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+              <div
+                className={
+                  useHorizontalPagePickerOnMobile
+                    ? "-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 py-2 md:mx-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:overflow-visible md:px-0 md:py-0"
+                    : "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]"
+                }
+              >
                 {cropPdfPreviews.map((previewSrc, index) => {
                   const pageNumber = index + 1;
                   const isSelected = selectedCropPage === pageNumber;
@@ -289,6 +420,10 @@ export function CropPdfPanel({
                       type="button"
                       onClick={() => onSelectCropPage(pageNumber)}
                       className={`grid gap-2 rounded-lg p-2.5 text-left transition ${
+                        useHorizontalPagePickerOnMobile
+                          ? "w-[180px] flex-none snap-start"
+                          : "w-full"
+                      } ${
                         isSelected
                           ? "bg-teal-50 ring-2 ring-teal-600"
                           : "bg-white/80 ring-1 ring-slate-200 hover:ring-teal-400"
@@ -325,7 +460,7 @@ export function CropPdfPanel({
           )}
         </div>
 
-        <div className="order-1 flex h-full min-h-[calc(100dvh-3.5rem)] flex-col rounded-none border-y-0 border-l border-r-0 border-slate-200 bg-white p-4 shadow-none md:sticky md:top-14 md:order-2 md:w-[360px] md:self-stretch md:justify-self-end">
+        <div className="order-1 flex min-h-0 min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:sticky md:top-14 md:order-2 md:h-full md:min-h-[calc(100dvh-3.5rem)] md:w-[360px] md:self-stretch md:justify-self-end md:rounded-none md:border-y-0 md:border-l md:border-r-0 md:p-4 md:shadow-none">
           <div className="border-b border-slate-200 pb-3">
             <p className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-teal-800">
               PDF Utilities
@@ -340,7 +475,7 @@ export function CropPdfPanel({
 
           {!cropPdfBuffer && (
             <div className="mt-3 flex flex-col gap-2.5">
-              <label className="relative inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800">
+              <label className="relative inline-flex min-h-10 md:min-h-9 cursor-pointer items-center justify-center rounded-lg border border-teal-700 bg-white px-3 text-sm font-semibold text-teal-800">
                 <input
                   type="file"
                   accept="application/pdf,.pdf"
@@ -370,7 +505,7 @@ export function CropPdfPanel({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-800 disabled:opacity-40"
+                  className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-800 disabled:opacity-40"
                   onClick={onResetSelectedPageCrop}
                   disabled={isCropPdfBusy || isBusy}
                 >
@@ -378,7 +513,7 @@ export function CropPdfPanel({
                 </button>
                 <button
                   type="button"
-                  className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-800 disabled:opacity-40"
+                  className="min-h-10 md:min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-800 disabled:opacity-40"
                   onClick={onCopySelectedCropToAllPages}
                   disabled={isCropPdfBusy || isBusy}
                 >
@@ -388,7 +523,7 @@ export function CropPdfPanel({
 
               <button
                 type="button"
-                className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold ${
+                className={`inline-flex min-h-10 md:min-h-9 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold ${
                   cropPdfPreviews.length > 0
                     ? "border-teal-700 bg-white text-teal-800"
                     : "border-slate-300 bg-slate-100 text-slate-400"
@@ -400,7 +535,7 @@ export function CropPdfPanel({
               </button>
 
               <p className="text-xs text-slate-400">
-                Select a page and drag on the large preview to crop by mouse.
+                Select a page and drag on the large preview to crop by mouse or touch.
               </p>
               <p className="text-xs text-slate-400">
                 {hasAnyCrop ? "Crop settings are configured." : "No crop settings yet."}
@@ -411,7 +546,7 @@ export function CropPdfPanel({
           <div className="mt-3 flex flex-col gap-2.5 border-t border-slate-200 pt-3">
             <button
               type="button"
-              className={`min-h-9 rounded-lg border px-3 text-sm font-semibold transition ${
+              className={`min-h-10 md:min-h-9 rounded-lg border px-3 text-sm font-semibold transition ${
                 cropPdfResultBuffer
                   ? "border-transparent bg-teal-700 text-white hover:bg-teal-800"
                   : "border-slate-300 bg-slate-100 text-slate-400"

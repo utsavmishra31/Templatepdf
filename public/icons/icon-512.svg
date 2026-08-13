@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Template Filler icon">
+  <rect width="512" height="512" rx="96" fill="#0f766e"/>
+  <rect x="112" y="92" width="288" height="328" rx="36" fill="#ffffff"/>
+  <rect x="156" y="154" width="200" height="30" rx="15" fill="#0f766e"/>
+  <rect x="156" y="218" width="200" height="30" rx="15" fill="#99f6e4"/>
+  <rect x="156" y="282" width="136" height="30" rx="15" fill="#0f766e"/>
+  <circle cx="336" cy="352" r="48" fill="#14b8a6"/>
+  <path d="M320 352h32" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  <path d="M336 336v32" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+</svg>

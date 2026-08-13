@@ -49,6 +49,7 @@ export default function WordDeletePage() {
         onWordPageRangeInputChange={tool.handleWordPageRangeInputChange}
         onDeleteSelectedWordPages={tool.handleDeleteSelectedWordPages}
         onToggleWordPageSelection={tool.toggleWordPageSelection}
+        canDownloadWord={tool.canDownloadWord}
         onDownloadWord={tool.handleDownloadWord}
       />
     </div>

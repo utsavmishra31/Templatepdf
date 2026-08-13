@@ -89,6 +89,7 @@ export function usePdfDeleteTool() {
   const [pdfStatus, setPdfStatus] = useState("");
   const [pdfStatusType, setPdfStatusType] = useState<StatusType>("");
   const [isPdfBusy, setIsPdfBusy] = useState(false);
+  const [canDownloadPdf, setCanDownloadPdf] = useState(false);
 
   function applyPdfStatus(message: string, type: StatusType) {
     setPdfStatusType(type);
@@ -138,6 +139,7 @@ export function usePdfDeleteTool() {
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
       setPdfPageRangeError("");
+      setCanDownloadPdf(false);
       applyPdfStatus(
         `Loaded ${previews.length} page(s). Select pages you want to delete.`,
         "success",
@@ -149,6 +151,7 @@ export function usePdfDeleteTool() {
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
       setPdfPageRangeError("");
+      setCanDownloadPdf(false);
       applyPdfStatus(
         error instanceof Error ? error.message : "Could not read this PDF.",
         "error",
@@ -165,6 +168,7 @@ export function usePdfDeleteTool() {
     setSelectedPdfPages([]);
     setPdfPageRangeInput("");
     setPdfPageRangeError("");
+    setCanDownloadPdf(false);
     applyPdfStatus("PDF selection cleared.", "success");
   }
 
@@ -249,6 +253,7 @@ export function usePdfDeleteTool() {
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
       setPdfPageRangeError("");
+      setCanDownloadPdf(true);
       applyPdfStatus(
         `Deleted ${result.removedCount} page(s). Review the pages below, then click Download PDF.`,
         "success",
@@ -264,7 +269,7 @@ export function usePdfDeleteTool() {
   }
 
   function handleDownloadPdf() {
-    if (!uploadedPdfBuffer || !uploadedPdfName) return;
+    if (!uploadedPdfBuffer || !uploadedPdfName || !canDownloadPdf) return;
     downloadBlob(
       new Blob([uploadedPdfBuffer], { type: PDF_MIME }),
       uploadedPdfName,
@@ -297,6 +302,7 @@ export function usePdfDeleteTool() {
       setSelectedPdfPages([]);
       setPdfPageRangeInput("");
       setPdfPageRangeError("");
+      setCanDownloadPdf(false);
       applyPdfStatus(
         `Loaded ${previews.length} page(s). Select pages you want to delete.`,
         "success",
@@ -321,6 +327,7 @@ export function usePdfDeleteTool() {
     pdfStatus,
     pdfStatusType,
     isPdfBusy,
+    canDownloadPdf,
     handleUploadPdf,
     clearUploadedPdf,
     togglePdfPageSelection,
