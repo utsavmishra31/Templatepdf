@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { StatusType } from "@/types/editor";
 import type { ImageEntry, Orientation, PageSize } from "@/hooks/useJpgToPdfTool";
+
+const TOUCH_AUTOSCROLL_EDGE_PX = 96;
+const TOUCH_AUTOSCROLL_MAX_SPEED_PX = 16;
 
 // ---------------------------------------------------------------------------
 // Mini page-layout preview — JS pixel math avoids CSS aspect-ratio conflicts
@@ -116,6 +119,16 @@ export function JpgToPdfPanel({
   const [isTouchDragging, setIsTouchDragging] = useState(false);
   const [showAck, setShowAck] = useState(false);
   const prevResultBuffer = useRef<ArrayBuffer | null>(null);
+  const cardsContainerRef = useRef<HTMLDivElement | null>(null);
+  const touchPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const touchAutoScrollFrameRef = useRef<number | null>(null);
+  const isTouchDraggingRef = useRef(false);
+  const dragOverRef = useRef<number | null>(null);
+
+  function updateDragOver(nextIndex: number | null) {
+    dragOverRef.current = nextIndex;
+    setDragOver(nextIndex);
+  }
 
   function getTouchDropIndex(touchPoint: { clientX: number; clientY: number }) {
     const elementUnderTouch = document.elementFromPoint(touchPoint.clientX, touchPoint.clientY);
@@ -130,10 +143,85 @@ export function JpgToPdfPanel({
   }
 
   function resetDragState() {
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+    touchPointRef.current = null;
+    isTouchDraggingRef.current = false;
     setDragSrc(null);
-    setDragOver(null);
+    updateDragOver(null);
     setIsTouchDragging(false);
   }
+
+  function getEdgeSpeed(distanceIntoEdge: number) {
+    const ratio = Math.max(0, Math.min(1, distanceIntoEdge / TOUCH_AUTOSCROLL_EDGE_PX));
+    return ratio * TOUCH_AUTOSCROLL_MAX_SPEED_PX;
+  }
+
+  const runTouchAutoScroll = useCallback(() => {
+    if (!isTouchDraggingRef.current) {
+      touchAutoScrollFrameRef.current = null;
+      return;
+    }
+
+    const touchPoint = touchPointRef.current;
+    if (!touchPoint) {
+      touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      return;
+    }
+
+    const cardsContainer = cardsContainerRef.current;
+    let consumedByCardsContainer = false;
+
+    if (cardsContainer) {
+      const rect = cardsContainer.getBoundingClientRect();
+      const isTouchInsideContainer = touchPoint.clientY >= rect.top && touchPoint.clientY <= rect.bottom;
+
+      if (isTouchInsideContainer && cardsContainer.scrollHeight > cardsContainer.clientHeight) {
+        const containerEdge = Math.min(
+          TOUCH_AUTOSCROLL_EDGE_PX,
+          Math.max(24, rect.height * 0.22),
+        );
+        let containerDelta = 0;
+
+        if (touchPoint.clientY < rect.top + containerEdge) {
+          containerDelta = -getEdgeSpeed(rect.top + containerEdge - touchPoint.clientY);
+        } else if (touchPoint.clientY > rect.bottom - containerEdge) {
+          containerDelta = getEdgeSpeed(touchPoint.clientY - (rect.bottom - containerEdge));
+        }
+
+        if (containerDelta !== 0) {
+          cardsContainer.scrollTop += containerDelta;
+          consumedByCardsContainer = true;
+        }
+      }
+    }
+
+    if (!consumedByCardsContainer) {
+      const viewportHeight = window.innerHeight;
+      let viewportDelta = 0;
+
+      if (touchPoint.clientY < TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = -getEdgeSpeed(TOUCH_AUTOSCROLL_EDGE_PX - touchPoint.clientY);
+      } else if (touchPoint.clientY > viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = getEdgeSpeed(
+          touchPoint.clientY - (viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX),
+        );
+      }
+
+      if (viewportDelta !== 0) {
+        window.scrollBy({ top: viewportDelta });
+      }
+    }
+
+    const nextDropIndex = getTouchDropIndex(touchPoint);
+    if (nextDropIndex !== null && nextDropIndex !== dragOverRef.current) {
+      updateDragOver(nextDropIndex);
+    }
+
+    touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+  }, []);
 
   useEffect(() => {
     if (resultBuffer && resultBuffer !== prevResultBuffer.current) {
@@ -146,11 +234,39 @@ export function JpgToPdfPanel({
     setShowAck(false);
   }, [orientation, pageSize]);
 
+  useEffect(() => {
+    isTouchDraggingRef.current = isTouchDragging;
+    if (isTouchDragging) {
+      if (touchAutoScrollFrameRef.current === null) {
+        touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      }
+      return;
+    }
+
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+  }, [isTouchDragging, runTouchAutoScroll]);
+
+  useEffect(() => {
+    dragOverRef.current = dragOver;
+  }, [dragOver]);
+
+  useEffect(() => {
+    return () => {
+      if (touchAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      }
+    };
+  }, []);
+
   return (
     <section className="md:-mt-8" aria-labelledby="jpgToPdfTitle">
       <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
         {/* Left: image cards */}
         <div
+          ref={cardsContainerRef}
           className="order-2 px-1 pt-2 md:order-1 md:max-h-[calc(100dvh-3.5rem)] md:overflow-y-auto md:pt-4 md:pl-4 md:pr-2"
           role="list"
           aria-label="Images to convert"
@@ -179,35 +295,41 @@ export function JpgToPdfPanel({
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "move";
-                      if (dragOver !== index) setDragOver(index);
+                      if (dragOver !== index) updateDragOver(index);
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
                       if (dragSrc !== null && dragSrc !== index)
                         onMoveImage(dragSrc, index);
                       setDragSrc(null);
-                      setDragOver(null);
+                      updateDragOver(null);
                     }}
                     onDragEnd={() => {
                       setDragSrc(null);
-                      setDragOver(null);
+                      updateDragOver(null);
                     }}
                     onDragLeave={(e) => {
                       if (!e.currentTarget.contains(e.relatedTarget as Node))
-                        setDragOver(null);
+                        updateDragOver(null);
                     }}
                     onTouchStart={() => {
                       if (isBusy) return;
                       setDragSrc(index);
-                      setDragOver(index);
+                      updateDragOver(index);
+                      touchPointRef.current = null;
                       setIsTouchDragging(true);
                     }}
                     onTouchMove={(event) => {
                       if (!isTouchDragging || dragSrc === null) return;
                       event.preventDefault();
-                      const nextDropIndex = getTouchDropIndex(event.touches[0]);
+                      const touchPoint = {
+                        clientX: event.touches[0].clientX,
+                        clientY: event.touches[0].clientY,
+                      };
+                      touchPointRef.current = touchPoint;
+                      const nextDropIndex = getTouchDropIndex(touchPoint);
                       if (nextDropIndex !== null && nextDropIndex !== dragOver) {
-                        setDragOver(nextDropIndex);
+                        updateDragOver(nextDropIndex);
                       }
                     }}
                     onTouchEnd={() => {

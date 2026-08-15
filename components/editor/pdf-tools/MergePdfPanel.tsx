@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { StatusType } from "@/types/editor";
+
+const TOUCH_AUTOSCROLL_EDGE_PX = 96;
+const TOUCH_AUTOSCROLL_MAX_SPEED_PX = 16;
 
 type Props = {
   mergePdfFiles: Array<{
@@ -42,8 +45,18 @@ export function MergePdfPanel({
   const [dragSrc, setDragSrc] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [isTouchDragging, setIsTouchDragging] = useState(false);
+  const cardsContainerRef = useRef<HTMLDivElement | null>(null);
+  const touchPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const touchAutoScrollFrameRef = useRef<number | null>(null);
+  const isTouchDraggingRef = useRef(false);
+  const dragOverRef = useRef<number | null>(null);
 
-  function getTouchDropIndex(touch: Touch) {
+  function updateDragOver(nextIndex: number | null) {
+    dragOverRef.current = nextIndex;
+    setDragOver(nextIndex);
+  }
+
+  function getTouchDropIndex(touch: { clientX: number; clientY: number }) {
     const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
     const card = elementUnderTouch?.closest<HTMLElement>("[data-merge-card-index]");
     if (!card) return null;
@@ -56,15 +69,118 @@ export function MergePdfPanel({
   }
 
   function resetDragState() {
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+    touchPointRef.current = null;
+    isTouchDraggingRef.current = false;
     setDragSrc(null);
-    setDragOver(null);
+    updateDragOver(null);
     setIsTouchDragging(false);
   }
+
+  function getEdgeSpeed(distanceIntoEdge: number) {
+    const ratio = Math.max(0, Math.min(1, distanceIntoEdge / TOUCH_AUTOSCROLL_EDGE_PX));
+    return ratio * TOUCH_AUTOSCROLL_MAX_SPEED_PX;
+  }
+
+  const runTouchAutoScroll = useCallback(() => {
+    if (!isTouchDraggingRef.current) {
+      touchAutoScrollFrameRef.current = null;
+      return;
+    }
+
+    const touchPoint = touchPointRef.current;
+    if (!touchPoint) {
+      touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      return;
+    }
+
+    const cardsContainer = cardsContainerRef.current;
+    let consumedByCardsContainer = false;
+
+    if (cardsContainer) {
+      const rect = cardsContainer.getBoundingClientRect();
+      const isTouchInsideContainer = touchPoint.clientY >= rect.top && touchPoint.clientY <= rect.bottom;
+
+      if (isTouchInsideContainer && cardsContainer.scrollHeight > cardsContainer.clientHeight) {
+        const containerEdge = Math.min(
+          TOUCH_AUTOSCROLL_EDGE_PX,
+          Math.max(24, rect.height * 0.22),
+        );
+        let containerDelta = 0;
+
+        if (touchPoint.clientY < rect.top + containerEdge) {
+          containerDelta = -getEdgeSpeed(rect.top + containerEdge - touchPoint.clientY);
+        } else if (touchPoint.clientY > rect.bottom - containerEdge) {
+          containerDelta = getEdgeSpeed(touchPoint.clientY - (rect.bottom - containerEdge));
+        }
+
+        if (containerDelta !== 0) {
+          cardsContainer.scrollTop += containerDelta;
+          consumedByCardsContainer = true;
+        }
+      }
+    }
+
+    if (!consumedByCardsContainer) {
+      const viewportHeight = window.innerHeight;
+      let viewportDelta = 0;
+
+      if (touchPoint.clientY < TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = -getEdgeSpeed(TOUCH_AUTOSCROLL_EDGE_PX - touchPoint.clientY);
+      } else if (touchPoint.clientY > viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = getEdgeSpeed(
+          touchPoint.clientY - (viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX),
+        );
+      }
+
+      if (viewportDelta !== 0) {
+        window.scrollBy({ top: viewportDelta });
+      }
+    }
+
+    const nextDropIndex = getTouchDropIndex(touchPoint);
+    if (nextDropIndex !== null && nextDropIndex !== dragOverRef.current) {
+      updateDragOver(nextDropIndex);
+    }
+
+    touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+  }, []);
+
+  useEffect(() => {
+    isTouchDraggingRef.current = isTouchDragging;
+    if (isTouchDragging) {
+      if (touchAutoScrollFrameRef.current === null) {
+        touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      }
+      return;
+    }
+
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+  }, [isTouchDragging, runTouchAutoScroll]);
+
+  useEffect(() => {
+    dragOverRef.current = dragOver;
+  }, [dragOver]);
+
+  useEffect(() => {
+    return () => {
+      if (touchAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   return (
     <section className="md:-mt-8" aria-labelledby="mergePdfTitle">
       <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
         <div
+          ref={cardsContainerRef}
           className="order-2 px-1 pt-2 md:order-1 md:max-h-[calc(100dvh-3.5rem)] md:overflow-y-auto md:pt-4 md:pl-4 md:pr-2"
           role="list"
           aria-label="PDF files to merge"
@@ -85,7 +201,7 @@ export function MergePdfPanel({
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "move";
-                      setDragOver(index);
+                      updateDragOver(index);
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -93,25 +209,31 @@ export function MergePdfPanel({
                         onMoveMergePdfFile(dragSrc, index);
                       }
                       setDragSrc(null);
-                      setDragOver(null);
+                      updateDragOver(null);
                     }}
                     onDragEnd={() => {
                       setDragSrc(null);
-                      setDragOver(null);
+                      updateDragOver(null);
                     }}
-                    onDragLeave={() => setDragOver(null)}
+                    onDragLeave={() => updateDragOver(null)}
                     onTouchStart={() => {
                       if (isMergePdfBusy || isAddingFiles || isBusy) return;
                       setDragSrc(index);
-                      setDragOver(index);
+                      updateDragOver(index);
+                      touchPointRef.current = null;
                       setIsTouchDragging(true);
                     }}
                     onTouchMove={(event) => {
                       if (!isTouchDragging || dragSrc === null) return;
                       event.preventDefault();
-                      const nextDropIndex = getTouchDropIndex(event.touches[0]);
+                      const touchPoint = {
+                        clientX: event.touches[0].clientX,
+                        clientY: event.touches[0].clientY,
+                      };
+                      touchPointRef.current = touchPoint;
+                      const nextDropIndex = getTouchDropIndex(touchPoint);
                       if (nextDropIndex !== null && nextDropIndex !== dragOver) {
-                        setDragOver(nextDropIndex);
+                        updateDragOver(nextDropIndex);
                       }
                     }}
                     onTouchEnd={() => {
