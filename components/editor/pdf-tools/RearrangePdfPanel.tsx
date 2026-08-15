@@ -316,7 +316,7 @@ export function RearrangePdfPanel({
                         e.stopPropagation();
                         onDeleteRearrangePage(index);
                       }}
-                      className="absolute -right-1.5 -top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 opacity-0 shadow-sm transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 group-hover/card:opacity-100 disabled:opacity-30"
+                      className="absolute -right-1.5 -top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 opacity-100 shadow-sm transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 md:opacity-0 md:group-hover/card:opacity-100 disabled:opacity-30"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -341,7 +341,7 @@ export function RearrangePdfPanel({
                       <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-bold text-white">
                         {index + 1}
                       </span>
-                      <div className="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/0 opacity-0 transition-all group-hover:bg-black/25 group-hover:opacity-100">
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/25 opacity-100 transition-all md:bg-black/0 md:opacity-0 md:group-hover:bg-black/25 md:group-hover:opacity-100">
                         <button
                           type="button"
                           title="Rotate counter-clockwise"
@@ -545,7 +545,7 @@ export function RearrangePdfPanel({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              Apply &amp; Download
+              {isRearrangePdfBusy ? "Loading..." : "Apply & Download"}
             </button>
             <button
               type="button"
