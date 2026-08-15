@@ -525,6 +525,29 @@ export function useScanToPdfTool() {
     setResultName("");
   }
 
+  function movePage(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+
+    setPages((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length
+      ) {
+        return prev;
+      }
+
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      if (!moved) return prev;
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setResultBuffer(null);
+    setResultName("");
+  }
+
   function clearAll() {
     setPages((prev) => {
       for (const page of prev) {
@@ -730,6 +753,7 @@ export function useScanToPdfTool() {
     rotateSelected,
     flipSelected,
     applyFilterToSelected,
+    movePage,
     removePage,
     clearAll,
     generatePdf,

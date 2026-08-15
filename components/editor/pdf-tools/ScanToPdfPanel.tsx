@@ -1,6 +1,11 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, RefObject } from "react";
 import type { ScanFilterMode, ScannedPage } from "@/hooks/useScanToPdfTool";
 import type { StatusType } from "@/types/editor";
+
+const TOUCH_AUTOSCROLL_EDGE_PX = 96;
+const TOUCH_AUTOSCROLL_MAX_SPEED_PX = 16;
+const TOUCH_DRAG_THRESHOLD_PX = 8;
 
 type Props = {
   pages: ScannedPage[];
@@ -24,6 +29,7 @@ type Props = {
   onTogglePageSelection: (pageId: string) => void;
   onRotateSelected: (direction: "cw" | "ccw") => void;
   onFlipSelected: (axis: "horizontal" | "vertical") => void;
+  onMovePage: (fromIndex: number, toIndex: number) => void;
   onRemovePage: (index: number) => void;
   onClearAll: () => void;
   onGeneratePdf: () => void;
@@ -52,13 +58,151 @@ export function ScanToPdfPanel({
   onTogglePageSelection,
   onRotateSelected,
   onFlipSelected,
+  onMovePage,
   onRemovePage,
   onClearAll,
   onGeneratePdf,
   onDownloadPdf,
 }: Props) {
+  const [dragSrc, setDragSrc] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const [isTouchDragging, setIsTouchDragging] = useState(false);
+  const cardsContainerRef = useRef<HTMLDivElement | null>(null);
+  const touchPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const touchAutoScrollFrameRef = useRef<number | null>(null);
+  const isTouchDraggingRef = useRef(false);
+  const dragOverRef = useRef<number | null>(null);
+  const blockNextClickRef = useRef(false);
+  const touchStartPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+
   const selectedSet = new Set(selectedPageIds);
   const allPagesSelected = pages.length > 0 && selectedPageIds.length === pages.length;
+
+  function updateDragOver(nextIndex: number | null) {
+    dragOverRef.current = nextIndex;
+    setDragOver(nextIndex);
+  }
+
+  function getTouchDropIndex(touchPoint: { clientX: number; clientY: number }) {
+    const elementUnderTouch = document.elementFromPoint(touchPoint.clientX, touchPoint.clientY);
+    const card = elementUnderTouch?.closest<HTMLElement>("[data-scan-card-index]");
+    if (!card) return null;
+
+    const indexValue = card.dataset.scanCardIndex;
+    if (indexValue === undefined) return null;
+
+    const parsedIndex = Number(indexValue);
+    return Number.isInteger(parsedIndex) ? parsedIndex : null;
+  }
+
+  function getEdgeSpeed(distanceIntoEdge: number) {
+    const ratio = Math.max(0, Math.min(1, distanceIntoEdge / TOUCH_AUTOSCROLL_EDGE_PX));
+    return ratio * TOUCH_AUTOSCROLL_MAX_SPEED_PX;
+  }
+
+  const runTouchAutoScroll = useCallback(() => {
+    if (!isTouchDraggingRef.current) {
+      touchAutoScrollFrameRef.current = null;
+      return;
+    }
+
+    const touchPoint = touchPointRef.current;
+    if (!touchPoint) {
+      touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      return;
+    }
+
+    const cardsContainer = cardsContainerRef.current;
+    let consumedByCardsContainer = false;
+
+    if (cardsContainer) {
+      const rect = cardsContainer.getBoundingClientRect();
+      const isTouchInsideContainer = touchPoint.clientY >= rect.top && touchPoint.clientY <= rect.bottom;
+
+      if (isTouchInsideContainer && cardsContainer.scrollHeight > cardsContainer.clientHeight) {
+        const containerEdge = Math.min(
+          TOUCH_AUTOSCROLL_EDGE_PX,
+          Math.max(24, rect.height * 0.22),
+        );
+        let containerDelta = 0;
+
+        if (touchPoint.clientY < rect.top + containerEdge) {
+          containerDelta = -getEdgeSpeed(rect.top + containerEdge - touchPoint.clientY);
+        } else if (touchPoint.clientY > rect.bottom - containerEdge) {
+          containerDelta = getEdgeSpeed(touchPoint.clientY - (rect.bottom - containerEdge));
+        }
+
+        if (containerDelta !== 0) {
+          cardsContainer.scrollTop += containerDelta;
+          consumedByCardsContainer = true;
+        }
+      }
+    }
+
+    if (!consumedByCardsContainer) {
+      const viewportHeight = window.innerHeight;
+      let viewportDelta = 0;
+
+      if (touchPoint.clientY < TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = -getEdgeSpeed(TOUCH_AUTOSCROLL_EDGE_PX - touchPoint.clientY);
+      } else if (touchPoint.clientY > viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX) {
+        viewportDelta = getEdgeSpeed(
+          touchPoint.clientY - (viewportHeight - TOUCH_AUTOSCROLL_EDGE_PX),
+        );
+      }
+
+      if (viewportDelta !== 0) {
+        window.scrollBy({ top: viewportDelta });
+      }
+    }
+
+    const nextDropIndex = getTouchDropIndex(touchPoint);
+    if (nextDropIndex !== null && nextDropIndex !== dragOverRef.current) {
+      updateDragOver(nextDropIndex);
+    }
+
+    touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+  }, []);
+
+  function resetDragState() {
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+    touchPointRef.current = null;
+    touchStartPointRef.current = null;
+    isTouchDraggingRef.current = false;
+    setDragSrc(null);
+    updateDragOver(null);
+    setIsTouchDragging(false);
+  }
+
+  useEffect(() => {
+    isTouchDraggingRef.current = isTouchDragging;
+    if (isTouchDragging) {
+      if (touchAutoScrollFrameRef.current === null) {
+        touchAutoScrollFrameRef.current = requestAnimationFrame(runTouchAutoScroll);
+      }
+      return;
+    }
+
+    if (touchAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      touchAutoScrollFrameRef.current = null;
+    }
+  }, [isTouchDragging, runTouchAutoScroll]);
+
+  useEffect(() => {
+    dragOverRef.current = dragOver;
+  }, [dragOver]);
+
+  useEffect(() => {
+    return () => {
+      if (touchAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(touchAutoScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   const handleToggleSelectAll = () => {
     if (isBusy || pages.length === 0) {
@@ -83,6 +227,7 @@ export function ScanToPdfPanel({
     <section className="md:-mt-8" aria-labelledby="scanToPdfTitle">
       <div className="mt-4 grid gap-4 md:mt-0 md:grid-cols-[minmax(0,1fr)_360px] md:items-stretch">
         <div
+          ref={cardsContainerRef}
           className="order-2 px-1 pt-2 md:order-1 md:max-h-[calc(100dvh-3.5rem)] md:overflow-y-auto md:pt-4 md:pl-4 md:pr-2"
           aria-label="Captured scan pages"
         >
@@ -135,20 +280,114 @@ export function ScanToPdfPanel({
           )}
 
           {pages.length > 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
+            <>
+              <p className="mb-3 text-xs text-slate-400">Drag cards to reorder pages.</p>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
               {pages.map((page, index) => (
                 <article
                   key={page.id}
+                  data-scan-card-index={index}
+                  draggable={!isBusy}
                   role="button"
                   tabIndex={0}
                   aria-pressed={selectedSet.has(page.id)}
                   aria-label={`Select scanned page ${index + 1}`}
                   className={`grid gap-2 rounded-lg p-2.5 shadow-sm transition ${
-                    selectedSet.has(page.id)
-                      ? "bg-teal-50 ring-2 ring-teal-500"
-                      : "bg-white/90 hover:ring-1 hover:ring-slate-300"
+                    dragSrc === index
+                      ? "touch-none cursor-grab bg-white/90 opacity-40 active:cursor-grabbing"
+                      : dragOver === index
+                        ? "touch-none cursor-grab bg-teal-50 ring-2 ring-teal-500 active:cursor-grabbing"
+                        : selectedSet.has(page.id)
+                          ? "touch-none cursor-grab bg-teal-50 ring-2 ring-teal-500 active:cursor-grabbing"
+                          : "touch-none cursor-grab bg-white/90 hover:ring-1 hover:ring-slate-300 active:cursor-grabbing"
                   }`}
-                  onClick={() => !isBusy && onTogglePageSelection(page.id)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                    event.dataTransfer.setDragImage(
+                      event.currentTarget as HTMLElement,
+                      event.clientX - rect.left,
+                      event.clientY - rect.top,
+                    );
+                    setDragSrc(index);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    if (dragOver !== index) {
+                      updateDragOver(index);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (dragSrc !== null && dragSrc !== index) {
+                      onMovePage(dragSrc, index);
+                    }
+                    setDragSrc(null);
+                    updateDragOver(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragSrc(null);
+                    updateDragOver(null);
+                  }}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                      updateDragOver(null);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    if (isBusy) return;
+                    setDragSrc(index);
+                    updateDragOver(index);
+                    touchPointRef.current = null;
+                    touchStartPointRef.current = null;
+                    blockNextClickRef.current = false;
+                    setIsTouchDragging(true);
+                  }}
+                  onTouchMove={(event) => {
+                    if (!isTouchDragging || dragSrc === null) return;
+                    event.preventDefault();
+                    const touchPoint = {
+                      clientX: event.touches[0].clientX,
+                      clientY: event.touches[0].clientY,
+                    };
+                    if (!touchStartPointRef.current) {
+                      touchStartPointRef.current = touchPoint;
+                    }
+
+                    const dx = touchPoint.clientX - touchStartPointRef.current.clientX;
+                    const dy = touchPoint.clientY - touchStartPointRef.current.clientY;
+                    if (Math.hypot(dx, dy) >= TOUCH_DRAG_THRESHOLD_PX) {
+                      blockNextClickRef.current = true;
+                    }
+
+                    touchPointRef.current = touchPoint;
+                    const nextDropIndex = getTouchDropIndex(touchPoint);
+                    if (nextDropIndex !== null && nextDropIndex !== dragOver) {
+                      updateDragOver(nextDropIndex);
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (
+                      isTouchDragging &&
+                      dragSrc !== null &&
+                      dragOver !== null &&
+                      dragSrc !== dragOver
+                    ) {
+                      onMovePage(dragSrc, dragOver);
+                    }
+                    resetDragState();
+                  }}
+                  onTouchCancel={resetDragState}
+                  onClick={() => {
+                    if (blockNextClickRef.current) {
+                      blockNextClickRef.current = false;
+                      return;
+                    }
+                    if (!isBusy) {
+                      onTogglePageSelection(page.id);
+                    }
+                  }}
                   onKeyDown={(event) => {
                     if (isBusy) {
                       return;
@@ -188,7 +427,8 @@ export function ScanToPdfPanel({
                   <p className="text-xs text-slate-500">{page.width} x {page.height}px</p>
                 </article>
               ))}
-            </div>
+              </div>
+            </>
           ) : (
             <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 text-center text-sm font-bold text-slate-500">
               Start camera or upload photos to build your scanned PDF.

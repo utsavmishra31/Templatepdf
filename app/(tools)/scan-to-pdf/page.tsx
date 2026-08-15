@@ -105,6 +105,7 @@ export default function ScanToPdfPage() {
         onTogglePageSelection={tool.togglePageSelection}
         onRotateSelected={tool.rotateSelected}
         onFlipSelected={tool.flipSelected}
+        onMovePage={tool.movePage}
         onRemovePage={tool.removePage}
         onClearAll={tool.clearAll}
         onGeneratePdf={tool.generatePdf}
