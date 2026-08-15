@@ -5,6 +5,7 @@ import type { ImageEntry, Orientation, PageSize } from "@/hooks/useJpgToPdfTool"
 
 const TOUCH_AUTOSCROLL_EDGE_PX = 96;
 const TOUCH_AUTOSCROLL_MAX_SPEED_PX = 16;
+const TOUCH_DRAG_THRESHOLD_PX = 8;
 
 // ---------------------------------------------------------------------------
 // Mini page-layout preview — JS pixel math avoids CSS aspect-ratio conflicts
@@ -124,6 +125,8 @@ export function JpgToPdfPanel({
   const touchAutoScrollFrameRef = useRef<number | null>(null);
   const isTouchDraggingRef = useRef(false);
   const dragOverRef = useRef<number | null>(null);
+  const touchStartPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const hasTouchDragIntentRef = useRef(false);
 
   function updateDragOver(nextIndex: number | null) {
     dragOverRef.current = nextIndex;
@@ -148,6 +151,8 @@ export function JpgToPdfPanel({
       touchAutoScrollFrameRef.current = null;
     }
     touchPointRef.current = null;
+    touchStartPointRef.current = null;
+    hasTouchDragIntentRef.current = false;
     isTouchDraggingRef.current = false;
     setDragSrc(null);
     updateDragOver(null);
@@ -317,6 +322,8 @@ export function JpgToPdfPanel({
                       setDragSrc(index);
                       updateDragOver(index);
                       touchPointRef.current = null;
+                      touchStartPointRef.current = null;
+                      hasTouchDragIntentRef.current = false;
                       setIsTouchDragging(true);
                     }}
                     onTouchMove={(event) => {
@@ -326,6 +333,20 @@ export function JpgToPdfPanel({
                         clientX: event.touches[0].clientX,
                         clientY: event.touches[0].clientY,
                       };
+
+                      if (!touchStartPointRef.current) {
+                        touchStartPointRef.current = touchPoint;
+                      }
+
+                      if (!hasTouchDragIntentRef.current) {
+                        const dx = touchPoint.clientX - touchStartPointRef.current.clientX;
+                        const dy = touchPoint.clientY - touchStartPointRef.current.clientY;
+                        if (Math.hypot(dx, dy) < TOUCH_DRAG_THRESHOLD_PX) {
+                          return;
+                        }
+                        hasTouchDragIntentRef.current = true;
+                      }
+
                       touchPointRef.current = touchPoint;
                       const nextDropIndex = getTouchDropIndex(touchPoint);
                       if (nextDropIndex !== null && nextDropIndex !== dragOver) {
