@@ -45,25 +45,27 @@ export function ToolUploadCard({
           />
 
           {/* Icon */}
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white/70 transition group-hover:border-amber-200/50 group-hover:bg-white/15 group-hover:text-amber-200">
-            {isBusy ? (
-              <svg
-                className="animate-spin text-amber-300"
-                xmlns="http://www.w3.org/2000/svg"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-            ) : (
-              icon
-            )}
+          <div className="upload-icon flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white/70 transition group-hover:border-amber-200/50 group-hover:bg-white/15 group-hover:text-amber-200">
+            <span className="inline-flex transition-transform duration-300 ease-out group-hover:scale-110">
+              {isBusy ? (
+                <svg
+                  className="animate-spin text-amber-300"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                icon
+              )}
+            </span>
           </div>
 
           {/* Text */}

@@ -67,3 +67,40 @@ body {
   backface-visibility: hidden;
   contain: strict;
 }
+
+/* ================= Tool icon animations ================= */
+@keyframes iconFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.tool-icon {
+  animation: iconFloat 3.6s ease-in-out infinite;
+}
+.group:hover .tool-icon {
+  animation-play-state: paused;
+}
+
+@keyframes uploadIconFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-2deg);
+  }
+}
+.upload-icon {
+  animation: uploadIconFloat 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-icon,
+  .upload-icon {
+    animation: none !important;
+  }
+}

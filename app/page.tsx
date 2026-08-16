@@ -328,7 +328,7 @@ export default function DashboardPage() {
         {/* Tool grid */}
         <div className="mx-auto w-[min(1180px,calc(100%-32px))] pb-14 pt-4">
           <div className="grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-sm:grid-cols-1">
-            {tools.map((tool) => (
+            {tools.map((tool, i) => (
             <Link
               key={tool.href}
               href={tool.href}
@@ -339,8 +339,13 @@ export default function DashboardPage() {
               <span className="pointer-events-none absolute -inset-px rounded-2xl bg-gradient-to-b from-white/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
               {/* Icon */}
-              <div className={`relative mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg ring-1 ring-white/40 ${tool.iconBg} ${tool.iconColor}`}>
-                {tool.icon}
+              <div
+                className={`tool-icon relative mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg ring-1 ring-white/40 ${tool.iconBg} ${tool.iconColor}`}
+                style={{ animationDelay: `${-((i % 5) * 0.7)}s` }}
+              >
+                <span className="inline-flex transition-transform duration-300 ease-out group-hover:scale-110 group-hover:-rotate-6">
+                  {tool.icon}
+                </span>
               </div>
 
               {/* Text */}
