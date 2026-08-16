@@ -49,6 +49,7 @@ export default function PdfDeletePage() {
         onPdfPageRangeInputChange={tool.handlePdfPageRangeInputChange}
         onDeleteSelectedPages={tool.handleDeleteSelectedPdfPages}
         onTogglePageSelection={tool.togglePdfPageSelection}
+        canDownloadPdf={tool.canDownloadPdf}
         onDownloadPdf={tool.handleDownloadPdf}
       />
     </div>

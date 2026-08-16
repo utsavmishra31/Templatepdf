@@ -99,6 +99,7 @@ export function useWordDeleteTool() {
   const [wordStatus, setWordStatus] = useState("");
   const [wordStatusType, setWordStatusType] = useState<StatusType>("");
   const [isWordBusy, setIsWordBusy] = useState(false);
+  const [canDownloadWord, setCanDownloadWord] = useState(false);
 
   function applyWordStatus(message: string, type: StatusType) {
     setWordStatusType(type);
@@ -150,6 +151,7 @@ export function useWordDeleteTool() {
       setSelectedWordPages([]);
       setWordPageRangeInput("");
       setWordPageRangeError("");
+      setCanDownloadWord(false);
       applyWordStatus(
         `Loaded ${previews.length} page(s). Select pages you want to delete.`,
         "success",
@@ -162,6 +164,7 @@ export function useWordDeleteTool() {
       setSelectedWordPages([]);
       setWordPageRangeInput("");
       setWordPageRangeError("");
+      setCanDownloadWord(false);
       applyWordStatus(
         error instanceof Error
           ? error.message
@@ -181,6 +184,7 @@ export function useWordDeleteTool() {
     setSelectedWordPages([]);
     setWordPageRangeInput("");
     setWordPageRangeError("");
+    setCanDownloadWord(false);
     applyWordStatus("Word selection cleared.", "success");
   }
 
@@ -264,6 +268,7 @@ export function useWordDeleteTool() {
       setSelectedWordPages([]);
       setWordPageRangeInput("");
       setWordPageRangeError("");
+      setCanDownloadWord(true);
       applyWordStatus(
         `Deleted ${result.removedCount} page(s). Review the pages below, then click Download DOCX.`,
         "success",
@@ -279,7 +284,7 @@ export function useWordDeleteTool() {
   }
 
   async function handleDownloadWord() {
-    if (!workingPdfBuffer || !uploadedWordName) return;
+    if (!workingPdfBuffer || !uploadedWordName || !canDownloadWord) return;
 
     setIsWordBusy(true);
     applyWordStatus("Preparing Word file for download\u2026", "");
@@ -318,6 +323,7 @@ export function useWordDeleteTool() {
     wordStatus,
     wordStatusType,
     isWordBusy,
+    canDownloadWord,
     handleUploadWord,
     clearUploadedWord,
     toggleWordPageSelection,

@@ -196,6 +196,7 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         mergePdfStatus={props.mergePdfStatus}
         mergePdfStatusType={props.mergePdfStatusType}
         isMergePdfBusy={props.isMergePdfBusy}
+        isAddingFiles={false}
         isBusy={props.isBusy}
         onAddMergePdfFiles={props.onAddMergePdfFiles}
         onRemoveMergePdfFile={props.onRemoveMergePdfFile}
@@ -208,17 +209,20 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         compressPdfName={props.compressPdfName}
         compressPdfBuffer={props.compressPdfBuffer}
         compressPdfOriginalSize={props.compressPdfOriginalSize}
-        compressPdfQuality={props.compressPdfQuality}
         compressPdfResultBuffer={props.compressPdfResultBuffer}
         compressPdfResultName={props.compressPdfResultName}
         compressPdfResultSize={props.compressPdfResultSize}
         compressPdfStatus={props.compressPdfStatus}
         compressPdfStatusType={props.compressPdfStatusType}
+        compressPdfFirstPage={null}
+        compressMode={props.compressPdfQuality === "extreme" ? "extreme" : "normal"}
         isCompressPdfBusy={props.isCompressPdfBusy}
         isBusy={props.isBusy}
         onUploadCompressPdf={props.onUploadCompressPdf}
         onClearCompressPdf={props.onClearCompressPdf}
-        onCompressPdfQualityChange={props.onCompressPdfQualityChange}
+        onCompressModeChange={(mode) =>
+          props.onCompressPdfQualityChange(mode === "extreme" ? "extreme" : "recommended")
+        }
         onCompressPdf={props.onCompressPdf}
         onDownloadCompressedPdf={props.onDownloadCompressedPdf}
       />

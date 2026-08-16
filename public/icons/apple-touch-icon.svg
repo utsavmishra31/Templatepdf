@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Template Filler Apple touch icon">
+  <rect width="180" height="180" rx="36" fill="#0f766e"/>
+  <rect x="39" y="31" width="102" height="118" rx="14" fill="#ffffff"/>
+  <rect x="54" y="54" width="72" height="10" rx="5" fill="#0f766e"/>
+  <rect x="54" y="76" width="72" height="10" rx="5" fill="#99f6e4"/>
+  <rect x="54" y="98" width="48" height="10" rx="5" fill="#0f766e"/>
+  <circle cx="118" cy="126" r="16" fill="#14b8a6"/>
+  <path d="M113 126h10" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M118 121v10" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+</svg>
