@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AnimeScene from "@/components/AnimeScene";
 
 const tools = [
   {
@@ -304,46 +305,54 @@ const tools = [
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Hero */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto w-[min(1180px,calc(100%-32px))] py-12 max-md:py-8">
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-teal-700">
-            PDF &amp; Doc Tools
-          </p>
-          <h1 className="font-[var(--font-newsreader)] text-4xl font-semibold text-slate-900 max-md:text-3xl">
-            What would you like to do?
-          </h1>
-          <p className="mt-2 max-w-xl text-slate-500">
-            All tools run locally in your browser or via a secure server-side process. No files are stored.
-          </p>
-        </div>
-      </div>
+    <div className="relative min-h-screen">
+      <AnimeScene />
 
-      {/* Tool grid */}
-      <div className="mx-auto w-[min(1180px,calc(100%-32px))] py-10">
-        <div className="grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-sm:grid-cols-1">
-          {tools.map((tool) => (
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Hero */}
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))] pb-6 pt-14 max-md:pt-10">
+          <div className="inline-block max-w-xl rounded-3xl border border-white/15 bg-slate-950/45 px-6 py-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] backdrop-blur-md">
+            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-amber-300/90">
+              PDF &amp; Doc Tools
+            </p>
+            <h1 className="font-[var(--font-newsreader)] text-4xl font-semibold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] max-md:text-3xl">
+              What would you like to do?
+            </h1>
+            <p className="mt-2 max-w-xl text-slate-200/90">
+              All tools run locally in your browser or via a secure server-side process. No files are stored.
+            </p>
+          </div>
+        </div>
+
+        {/* Tool grid */}
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))] pb-14 pt-4">
+          <div className="grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            {tools.map((tool) => (
             <Link
               key={tool.href}
               href={tool.href}
-              className="group relative flex flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/60 p-6 shadow-[0_10px_38px_rgba(0,0,0,0.4)] transition duration-300 hover:-translate-y-1.5 hover:border-amber-200/40 hover:bg-slate-950/70 hover:shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
             >
+              {/* Glass edge highlight + hover glow */}
+              <span className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+              <span className="pointer-events-none absolute -inset-px rounded-2xl bg-gradient-to-b from-white/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
               {/* Icon */}
-              <div className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl ${tool.iconBg} ${tool.iconColor}`}>
+              <div className={`relative mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg ring-1 ring-white/40 ${tool.iconBg} ${tool.iconColor}`}>
                 {tool.icon}
               </div>
 
               {/* Text */}
-              <h2 className="text-base font-extrabold text-slate-900">
+              <h2 className="relative text-base font-bold text-white">
                 {tool.title}
               </h2>
-              <p className="mt-1 flex-1 text-sm text-slate-500 leading-relaxed">
+              <p className="relative mt-1 flex-1 text-sm leading-relaxed text-slate-300">
                 {tool.description}
               </p>
 
               {/* Footer */}
-              <div className="mt-4 flex items-center justify-between">
+              <div className="relative mt-4 flex items-center justify-between">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold ${tool.badgeColor}`}>
                   {tool.badge}
                 </span>
@@ -357,14 +366,15 @@ export default function DashboardPage() {
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500"
+                  className="text-white/35 transition group-hover:translate-x-0.5 group-hover:text-white"
                 >
                   <path d="M5 12h14"/>
                   <path d="M12 5l7 7-7 7"/>
                 </svg>
               </div>
             </Link>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
