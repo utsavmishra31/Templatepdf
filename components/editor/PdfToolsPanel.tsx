@@ -29,6 +29,8 @@ type PdfToolsPanelProps = {
   wordStatusType: StatusType;
   isWordBusy: boolean;
   isBusy: boolean;
+  canDownloadPdf?: boolean;
+  canDownloadWord?: boolean;
   onUploadPdf: (event: ChangeEvent<HTMLInputElement>) => void;
   onClearPdf: () => void;
   onPdfPageRangeInputChange: (value: string) => void;
@@ -139,6 +141,7 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         onPdfPageRangeInputChange={props.onPdfPageRangeInputChange}
         onDeleteSelectedPages={props.onDeleteSelectedPages}
         onTogglePageSelection={props.onTogglePageSelection}
+        canDownloadPdf={props.canDownloadPdf ?? false}
         onDownloadPdf={props.onDownloadPdf}
       />
       <DeleteWordPagesPanel
@@ -157,6 +160,7 @@ export function PdfToolsPanel(props: PdfToolsPanelProps) {
         onWordPageRangeInputChange={props.onWordPageRangeInputChange}
         onDeleteSelectedWordPages={props.onDeleteSelectedWordPages}
         onToggleWordPageSelection={props.onToggleWordPageSelection}
+        canDownloadWord={props.canDownloadWord ?? false}
         onDownloadWord={props.onDownloadWord}
       />
       <WordToPdfPanel

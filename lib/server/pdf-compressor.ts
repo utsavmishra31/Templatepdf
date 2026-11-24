@@ -14,6 +14,8 @@ import { deflateSync, inflateSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import type { PDFDict } from "pdf-lib";
+import type sharpLib from "sharp";
 
 const execFileAsync = promisify(execFile);
 
@@ -25,7 +27,9 @@ const MODE_CONFIG = {
 } as const;
 
 function toBuffer(source: ArrayBuffer | Uint8Array): Buffer {
-  return Buffer.from(source instanceof Uint8Array ? source : source);
+  return source instanceof Uint8Array
+    ? Buffer.from(source.buffer, source.byteOffset, source.byteLength)
+    : Buffer.from(source);
 }
 
 async function withTempDir<T>(work: (dir: string) => Promise<T>): Promise<T> {
@@ -72,10 +76,10 @@ async function compressWithPdfLibEnhanced(
   maxImagePx: number,
   jpegQuality: number,
 ): Promise<Buffer> {
-  const { PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFDict } =
+  const { PDFDocument, PDFName, PDFNumber, PDFRawStream } =
     await import("pdf-lib");
 
-  let sharp: typeof import("sharp") | null = null;
+  let sharp: typeof sharpLib | null = null;
   try {
     sharp = (await import("sharp")).default;
   } catch {

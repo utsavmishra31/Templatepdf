@@ -115,7 +115,7 @@ export async function POST(request: Request) {
     );
 
     if (converted.length === 1) {
-      return new Response(converted[0].buffer, {
+      return new Response(new Uint8Array(converted[0].buffer), {
         headers: {
           "Content-Type": formatConfig.mimeType,
           "Cache-Control": "no-store",
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     }
     const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
 
-    return new Response(zipBuffer, {
+    return new Response(new Uint8Array(zipBuffer), {
       headers: {
         "Content-Type": "application/zip",
         "Cache-Control": "no-store",
